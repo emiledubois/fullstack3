@@ -1,0 +1,105 @@
+services:
+  # ── Base de datos por servicio (Database-per-Service pattern) ──
+  postgres-products:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: products_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - products-data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-net
+
+  postgres-auth:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - auth-data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-net
+
+  postgres-orders:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: orders_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - orders-data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-net
+
+  # ── Microservicios ──
+  product-service:
+    build: ./services/product-service
+    ports:
+      - "8082:8082"
+    environment:
+      DB_HOST: postgres-products
+      DB_NAME: products_db
+      DB_USER: postgres
+      DB_PASS: secret
+    depends_on:
+      - postgres-products
+    networks:
+      - ecommerce-net
+
+  auth-service:
+    build: ./services/auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      DB_HOST: postgres-auth
+      DB_NAME: auth_db
+      DB_USER: postgres
+      DB_PASS: secret
+      JWT_SECRET: un_secreto_seguro_de_256_bits_minimo
+    depends_on:
+      - postgres-auth
+    networks:
+      - ecommerce-net
+
+  order-service:
+    build: ./services/order-service
+    ports:
+      - "8083:8083"
+    environment:
+      DB_HOST: postgres-orders
+      DB_NAME: orders_db
+      DB_USER: postgres
+      DB_PASS: secret
+    depends_on:
+      - postgres-orders
+    networks:
+      - ecommerce-net
+
+  api-gateway:
+    build: ./services/api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      JWT_SECRET: un_secreto_seguro_de_256_bits_minimo
+    networks:
+      - ecommerce-net
+
+#  frontend:
+#    build: ./frontend/ecommerce-app
+#    ports:
+#      - "5173:80"
+#    depends_on:
+#      - api-gateway
+#    networks:
+#      - ecommerce-net
+
+volumes:
+  products-data:
+  auth-data:
+  orders-data:
+
+networks:
+  ecommerce-net:
+    driver: bridge
