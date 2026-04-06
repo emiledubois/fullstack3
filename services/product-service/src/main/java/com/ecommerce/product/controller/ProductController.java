@@ -51,4 +51,14 @@ public class ProductController {
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("product-service UP");
     }
+
+    @GetMapping("/{id}/price")
+    public ResponseEntity<Double> getPriceWithDiscount(
+        @PathVariable Long id,
+        @RequestParam(defaultValue = "DEFAULT") String userType) {
+        return ResponseEntity.ok(productService.calculateDiscountedPrice(id, userType));
+    }
+// Prueba: GET /productos/1/price?userType=VIP
+
+
 }

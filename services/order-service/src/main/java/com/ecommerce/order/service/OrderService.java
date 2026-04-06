@@ -7,12 +7,17 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.stream.Collectors;
+import com.ecommerce.order.event.OrderCreatedEvent;
+import org.springframework.context.ApplicationEventPublisher;
+
+
 
 @Service
 @RequiredArgsConstructor
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public OrderDTO createOrder(CreateOrderRequest req) {
         if (req.getUserId() == null || req.getTotal() == null)
@@ -25,6 +30,10 @@ public class OrderService {
                 .build();
 
         return OrderDTO.from(orderRepository.save(order));
+       	eventPublisher.publishEvent(
+          new OrderCreatedEvent(this, result.getId(), req.getUserEmail(),
+	  result.getTotal())	);
+
         // TODO Fase 2: publicar OrderCreatedEvent → notification-service
     }
 

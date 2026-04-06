@@ -12,7 +12,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ProductService {
 
-    private final ProductRepository productRepository;
+	private final ProductRepository productRepository;
+	private final DiscountStrategyFactory discountStrategyFactory;
 
     public List<ProductDTO> getAllProducts() {
         return productRepository.findAll()
@@ -44,4 +45,11 @@ public class ProductService {
             throw new RuntimeException("Producto no encontrado: " + id);
         productRepository.deleteById(id);
     }
+
+    public double calculateDiscountedPrice(Long productId, String userType) {
+        ProductDTO product = getProductById(productId);
+        DiscountStrategy strategy = discountStrategyFactory.getStrategy(userType);
+        return strategy.apply(product.getPrice());
+    }
+   
 }
