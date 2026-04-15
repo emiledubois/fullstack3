@@ -1,105 +1,83 @@
-services:
-  # ── Base de datos por servicio (Database-per-Service pattern) ──
-  postgres-products:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: products_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secret
-    volumes:
-      - products-data:/var/lib/postgresql/data
-    networks:
-      - ecommerce-net
+version: "3.9"
 
+services:
+  # ── Bases de datos (Database-per-Service) ──
   postgres-auth:
     image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: auth_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secret
-    volumes:
-      - auth-data:/var/lib/postgresql/data
-    networks:
-      - ecommerce-net
+    environment: { POSTGRES_DB: auth_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: secret }
+    volumes: [auth-data:/var/lib/postgresql/data]
+    networks: [smartlogix-net]
 
-  postgres-orders:
+  postgres-inventario:
     image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: orders_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secret
-    volumes:
-      - orders-data:/var/lib/postgresql/data
-    networks:
-      - ecommerce-net
+    environment: { POSTGRES_DB: inventario_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: secret }
+    volumes: [inventario-data:/var/lib/postgresql/data]
+    networks: [smartlogix-net]
+
+  postgres-pedidos:
+    image: postgres:15-alpine
+    environment: { POSTGRES_DB: pedidos_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: secret }
+    volumes: [pedidos-data:/var/lib/postgresql/data]
+    networks: [smartlogix-net]
+
+  postgres-envios:
+    image: postgres:15-alpine
+    environment: { POSTGRES_DB: envios_db, POSTGRES_USER: postgres, POSTGRES_PASSWORD: secret }
+    volumes: [envios-data:/var/lib/postgresql/data]
+    networks: [smartlogix-net]
 
   # ── Microservicios ──
-  product-service:
-    build: ./services/product-service
-    ports:
-      - "8082:8082"
-    environment:
-      DB_HOST: postgres-products
-      DB_NAME: products_db
-      DB_USER: postgres
-      DB_PASS: secret
-    depends_on:
-      - postgres-products
-    networks:
-      - ecommerce-net
+  api-gateway:
+    build: ./services/api-gateway
+    ports: ["8080:8080"]
+    environment: { JWT_SECRET: bXlTZWN1cmVTZWNyZXRLZXkxMjM0NTY3ODkwQUJDREU= }
+    networks: [smartlogix-net]
 
   auth-service:
     build: ./services/auth-service
-    ports:
-      - "8081:8081"
-    environment:
-      DB_HOST: postgres-auth
-      DB_NAME: auth_db
-      DB_USER: postgres
-      DB_PASS: secret
-      JWT_SECRET: un_secreto_seguro_de_256_bits_minimo
-    depends_on:
-      - postgres-auth
-    networks:
-      - ecommerce-net
+    ports: ["8081:8081"]
+    environment: { DB_HOST: postgres-auth, DB_NAME: auth_db, DB_USER: postgres, DB_PASS: secret, JWT_SECRET: bXlTZWN1cmVTZWNyZXRLZXkxMjM0NTY3ODkwQUJDREU= }
+    depends_on: [postgres-auth]
+    networks: [smartlogix-net]
 
-  order-service:
-    build: ./services/order-service
-    ports:
-      - "8083:8083"
-    environment:
-      DB_HOST: postgres-orders
-      DB_NAME: orders_db
-      DB_USER: postgres
-      DB_PASS: secret
-    depends_on:
-      - postgres-orders
-    networks:
-      - ecommerce-net
+  ms-inventario:
+    build: ./services/ms-inventario
+    ports: ["8082:8082"]
+    environment: { DB_HOST: postgres-inventario, DB_NAME: inventario_db, DB_USER: postgres, DB_PASS: secret }
+    depends_on: [postgres-inventario]
+    networks: [smartlogix-net]
 
-  api-gateway:
-    build: ./services/api-gateway
-    ports:
-      - "8080:8080"
-    environment:
-      JWT_SECRET: un_secreto_seguro_de_256_bits_minimo
-    networks:
-      - ecommerce-net
+  ms-pedidos:
+    build: ./services/ms-pedidos
+    ports: ["8083:8083"]
+    environment: { DB_HOST: postgres-pedidos, DB_NAME: pedidos_db, DB_USER: postgres, DB_PASS: secret }
+    depends_on: [postgres-pedidos, ms-inventario]
+    networks: [smartlogix-net]
 
-#  frontend:
-#    build: ./frontend/ecommerce-app
-#    ports:
-#      - "5173:80"
-#    depends_on:
-#      - api-gateway
-#    networks:
-#      - ecommerce-net
+  ms-envios:
+    build: ./services/ms-envios
+    ports: ["8084:8084"]
+    environment: { DB_HOST: postgres-envios, DB_NAME: envios_db, DB_USER: postgres, DB_PASS: secret }
+    depends_on: [postgres-envios]
+    networks: [smartlogix-net]
+
+  notification-service:
+    build: ./services/notification-service
+    ports: ["8085:8085"]
+    networks: [smartlogix-net]
+
+  frontend:
+    build: ./frontend/smartlogix-app
+    ports: ["5173:80"]
+    depends_on: [api-gateway]
+    networks: [smartlogix-net]
 
 volumes:
-  products-data:
-  auth-data:
-  orders-data:
+  auth-data: {}
+  inventario-data: {}
+  pedidos-data: {}
+  envios-data: {}
 
 networks:
-  ecommerce-net:
+  smartlogix-net:
     driver: bridge
