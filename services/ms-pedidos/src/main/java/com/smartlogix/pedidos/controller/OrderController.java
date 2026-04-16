@@ -1,6 +1,7 @@
 package com.smartlogix.pedidos.controller;
 
-import com.smartlogix.pedidos.dto.*;
+import com.smartlogix.pedidos.dto.CreatePedidoRequest;
+import com.smartlogix.pedidos.dto.OrderDTO;
 import com.smartlogix.pedidos.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
@@ -20,7 +21,7 @@ public class OrderController {
     }
 
     @PostMapping
-    public ResponseEntity<OrderDTO> create(@RequestBody CreateOrderRequest req) {
+    public ResponseEntity<OrderDTO> create(@RequestBody CreatePedidoRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(orderService.createOrder(req));
     }
@@ -32,6 +33,6 @@ public class OrderController {
 
     @GetMapping("/health")
     public ResponseEntity<String> health() {
-        return ResponseEntity.ok("order-service UP");
+        return ResponseEntity.ok("ms-pedidos UP");
     }
 }

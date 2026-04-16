@@ -1,22 +1,25 @@
 package com.smartlogix.inventario.dto;
 
-import com.smartlogix.inventario.model.Product;
+import com.smartlogix.inventario.model.Producto;
 import lombok.*;
 
-// DTO: expone solo los campos necesarios (IL 1.3 — privacidad por diseño)
 @Data @NoArgsConstructor @AllArgsConstructor @Builder
 public class ProductDTO {
     private Long    id;
-    private String  name;
-    private Double  price;
-    private Integer stock;
-    private String  description;
+    private String  sku;
+    private String  nombre;
+    private Double  precioUnitario;
+    private Integer stockActual;
+    private Integer umbralMinimo;
+    private String  bodega;
+    private String  descripcion;
 
-    public static ProductDTO from(Product p) {
+    public static ProductDTO from(Producto p) {
         return ProductDTO.builder()
-                .id(p.getId()).name(p.getName())
-                .price(p.getPrice()).stock(p.getStock())
-                .description(p.getDescription())
+                .id(p.getId()).sku(p.getSku()).nombre(p.getNombre())
+                .precioUnitario(p.getPrecioUnitario()).stockActual(p.getStockActual())
+                .umbralMinimo(p.getUmbralMinimo()).bodega(p.getBodega())
+                .descripcion(p.getDescripcion())
                 .build();
     }
 }

@@ -1,6 +1,6 @@
 package com.smartlogix.pedidos.dto;
 
-import com.smartlogix.pedidos.model.Order;
+import com.smartlogix.pedidos.model.Pedido;
 import lombok.*;
 import java.time.LocalDateTime;
 
@@ -9,15 +9,22 @@ public class OrderDTO {
     private Long          id;
     private Long          userId;
     private String        userEmail;
+    private String        clienteNombre;
     private Double        total;
     private String        status;
-    private LocalDateTime createdAt;
+    private String        tipoPedido;
+    private String        destino;
+    private String        observaciones;
+    private LocalDateTime creadoEn;
 
-    public static OrderDTO from(Order o) {
+    public static OrderDTO from(Pedido p) {
         return OrderDTO.builder()
-                .id(o.getId()).userId(o.getUserId())
-                .userEmail(o.getUserEmail()).total(o.getTotal())
-                .status(o.getStatus()).createdAt(o.getCreatedAt())
+                .id(p.getId()).userId(p.getUserId())
+                .userEmail(p.getUserEmail()).clienteNombre(p.getClienteNombre())
+                .total(p.getTotal()).status(p.getStatus())
+                .tipoPedido(p.getTipoPedido()).destino(p.getDestino())
+                .observaciones(p.getObservaciones()).creadoEn(p.getCreadoEn())
                 .build();
     }
 }
+
