@@ -1,13 +1,25 @@
 package com.ecommerce.notification.service.listener;
 
-@Service @Slf4j
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+import java.util.Map;
+
+// notification-service: microservicio REST independiente
+@RestController
+@RequestMapping("/notificaciones")
+@Slf4j
 public class NotificationListener {
 
-    @EventListener @Async
-    public void handlePedidoAprobado(PedidoAprobadoEvent event) {
-        log.info("[SmartLogix] 📧 Notificación enviada a {} — Pedido #{} ({}) aprobado. Total: ${}",
-                 event.getUserEmail(), event.getPedidoId(),
-                 event.getTipoPedido(), event.getTotal());
-        // En producción: JavaMailSender.send(to, "Pedido aprobado", body)
+    // Endpoint REST para recibir notificaciones desde otros servicios
+    @PostMapping
+    public ResponseEntity<String> recibirNotificacion(@RequestBody Map<String, Object> payload) {
+        log.info("[notification-service] Notificación recibida: {}", payload);
+        return ResponseEntity.ok("Notificación procesada");
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("notification-service UP");
     }
 }

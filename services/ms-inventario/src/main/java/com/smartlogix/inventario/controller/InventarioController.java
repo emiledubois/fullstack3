@@ -1,3 +1,7 @@
+package com.smartlogix.inventario.controller;
+
+import com.smartlogix.inventario.dto.ProductDTO;
+import com.smartlogix.inventario.model.Producto;
 import com.smartlogix.inventario.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
