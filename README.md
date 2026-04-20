@@ -8,7 +8,7 @@
 
 ##  Descripción General
 
-SmartLogix es una plataforma de logística fullstack que provee una visibilidad y control sobre una cadena de operaciones de suministro. Construida con una arquitectura de microservicios con backend de Spring Boot y un frontend de React, maneja el registro de inventario, manejo de órdenes, logísticas de envíos y todo es accesible mediante una API gateway con autenticación JWT.
+SmartLogix es una plataforma de logística fullstack que provee visibilidad y control sobre una cadena de operaciones de suministro. Construida con una arquitectura de microservicios con backend de Spring Boot y un frontend de React, maneja el registro de inventario, manejo de órdenes, logísticas de envíos, y todo es accesible mediante una API gateway con autenticación JWT.
 
 ## Características Clave
 
