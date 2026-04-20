@@ -1,73 +1,116 @@
 import { useState, useEffect } from "react";
 import { enviosAPI } from "../services/api";
 
-export default function Envios() {
-  const [envios, setEnvios] = useState([]);
-  const [form, setForm] = useState({ pedidoId:"", tipoEnvio:"TERRESTRE", transportista:"", destino:"" });
-  const [error, setError] = useState(null);
+const EMPTY = { pedidoId:"", tipoEnvio:"TERRESTRE", transportista:"", destino:"" };
 
-  const loadEnvios = () => enviosAPI.getAll().then(r => setEnvios(r.data)).catch(console.error);
-  useEffect(() => { loadEnvios(); }, []);
+const STATUS = ["CREADO","ASIGNADO","EN_RUTA","ENTREGADO"];
+const STATUS_COLORS = {
+  CREADO:    "bg-yellow-100 text-yellow-800",
+  ASIGNADO:  "bg-blue-100 text-blue-800",
+  EN_RUTA:   "bg-purple-100 text-purple-800",
+  ENTREGADO: "bg-green-100 text-green-800",
+};
+
+const nextStatus = s => STATUS[STATUS.indexOf(s) + 1] || null;
+
+export default function Envios() {
+  const [envios,  setEnvios]  = useState([]);
+  const [form,    setForm]    = useState(EMPTY);
+  const [error,   setError]   = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = () => enviosAPI.getAll().then(r => setEnvios(r.data)).catch(console.error);
+  useEffect(() => { load(); }, []);
 
   const handleCreate = async (e) => {
-    e.preventDefault(); setError(null);
+    e.preventDefault(); setError(null); setLoading(true);
     try {
       await enviosAPI.create({ ...form, pedidoId: +form.pedidoId });
-      loadEnvios();
-      setForm({ pedidoId:"", tipoEnvio:"TERRESTRE", transportista:"", destino:"" });
-    } catch (err) { setError(err.response?.data?.message || err.message); }
+      setForm(EMPTY);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || "Error al crear envío");
+    } finally { setLoading(false); }
   };
 
-  const handleUpdateStatus = async (id, status) => {
-    try { await enviosAPI.updateStatus(id, status); loadEnvios(); }
-    catch (err) { alert(err.message); }
+  const handleAdvance = async (id, status) => {
+    try { await enviosAPI.updateStatus(id, status); await load(); }
+    catch (err) { setError(err.message); }
   };
 
-  const statusColor = s => ({
-    CREADO:"bg-yellow-100 text-yellow-800", ASIGNADO:"bg-blue-100 text-blue-800",
-    EN_RUTA:"bg-purple-100 text-purple-800", ENTREGADO:"bg-green-100 text-green-800"
-  })[s] || "bg-gray-100 text-gray-600";
-
-  const nextStatus = s => ({CREADO:"ASIGNADO",ASIGNADO:"EN_RUTA",EN_RUTA:"ENTREGADO"})[s];
+  const byStatus = st => envios.filter(e => e.status === st);
 
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-bold text-blue-900 mb-4">Coordinación de Envíos</h2>
-      {error && <div className="bg-red-50 text-red-700 rounded p-3 mb-4">{error}</div>}
-      <form onSubmit={handleCreate} className="grid grid-cols-4 gap-3 mb-6 bg-white p-4 rounded-xl shadow">
-        <input className="border rounded p-2" type="number" placeholder="ID Pedido" value={form.pedidoId} onChange={e=>setForm({...form,pedidoId:e.target.value})} required />
-        <select className="border rounded p-2" value={form.tipoEnvio} onChange={e=>setForm({...form,tipoEnvio:e.target.value})}>
-          <option>TERRESTRE</option><option>EXPRESS</option>
-        </select>
-        <input className="border rounded p-2" placeholder="Transportista" value={form.transportista} onChange={e=>setForm({...form,transportista:e.target.value})} />
-        <input className="border rounded p-2" placeholder="Destino" value={form.destino} onChange={e=>setForm({...form,destino:e.target.value})} />
-        <button type="submit" className="col-span-4 bg-purple-700 text-white rounded p-2 font-semibold">Crear Envío</button>
-      </form>
-      <table className="w-full bg-white rounded-xl shadow text-sm">
-        <thead className="bg-blue-800 text-white">
-          <tr>{["ID","Pedido","Tipo","Transportista","Destino","Ruta","Estado","Entrega est.","Acción"].map(h=><th key={h} className="p-3 text-left">{h}</th>)}</tr>
-        </thead>
-        <tbody>
-          {envios.map(e=>(
-            <tr key={e.id} className="border-b hover:bg-blue-50">
-              <td className="p-3">{e.id}</td>
-              <td className="p-3">{e.pedidoId}</td>
-              <td className="p-3">{e.tipoEnvio}</td>
-              <td className="p-3">{e.transportista}</td>
-              <td className="p-3">{e.destino}</td>
-              <td className="p-3 text-xs text-gray-500">{e.rutaDescripcion}</td>
-              <td className="p-3"><span className={`px-2 py-1 rounded-full text-xs ${statusColor(e.status)}`}>{e.status}</span></td>
-              <td className="p-3 text-xs">{e.fechaEstimadaEntrega?.substring(0,10)}</td>
-              <td className="p-3">{nextStatus(e.status) && (
-                <button onClick={()=>handleUpdateStatus(e.id, nextStatus(e.status))}
-                        className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">
-                  → {nextStatus(e.status)}
-                </button>
-              )}</td>
-            </tr>
+    <div className="p-6 max-w-7xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Coordinación de Envíos</h1>
+        <p className="text-gray-500 text-sm">{envios.length} envíos registrados</p>
+      </div>
+
+      {/* Formulario */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+        <h2 className="font-semibold text-gray-700 mb-4 text-sm uppercase tracking-wide">Nuevo envío</h2>
+        {error && <div className="bg-red-50 text-red-700 rounded-lg p-3 mb-3 text-sm">{error}</div>}
+        <form onSubmit={handleCreate} className="flex flex-wrap gap-3 items-end">
+          {[["pedidoId","ID Pedido","number"],["transportista","Transportista","text"],["destino","Destino","text"]].map(([k,l,t]) => (
+            <div key={k} className="flex-1 min-w-32">
+              <label className="block text-xs text-gray-500 mb-1">{l}</label>
+              <input type={t} required={k==="pedidoId"} value={form[k]}
+                     onChange={e => setForm({...form,[k]:e.target.value})}
+                     className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm
+                                focus:outline-none focus:ring-2 focus:ring-purple-500" />
+            </div>
           ))}
-        </tbody>
-      </table>
+          <div className="flex-1 min-w-32">
+            <label className="block text-xs text-gray-500 mb-1">Tipo envío</label>
+            <select value={form.tipoEnvio} onChange={e => setForm({...form,tipoEnvio:e.target.value})}
+                    className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm
+                               focus:outline-none focus:ring-2 focus:ring-purple-500">
+              <option>TERRESTRE</option><option>EXPRESS</option>
+            </select>
+          </div>
+          <button type="submit" disabled={loading}
+                  className="bg-purple-700 hover:bg-purple-800 text-white text-sm font-medium
+                             px-5 py-2 rounded-lg transition-colors disabled:opacity-50">
+            {loading ? "..." : "+ Crear envío"}
+          </button>
+        </form>
+      </div>
+
+      {/* Pipeline Kanban */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {STATUS.map(st => (
+          <div key={st} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className={`p-3 border-b border-gray-100 flex items-center justify-between`}>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[st]}`}>{st}</span>
+              <span className="text-xs text-gray-400">{byStatus(st).length}</span>
+            </div>
+            <div className="p-3 space-y-2 min-h-24">
+              {byStatus(st).map(e => (
+                <div key={e.id} className="border border-gray-100 rounded-lg p-3 hover:border-gray-200 transition-colors">
+                  <div className="flex justify-between items-start mb-1">
+                    <span className="text-xs font-semibold text-gray-700">#{e.id}</span>
+                    <span className="text-xs bg-gray-100 text-gray-500 px-1 rounded">{e.tipoEnvio}</span>
+                  </div>
+                  <p className="text-xs text-gray-600">Pedido #{e.pedidoId}</p>
+                  <p className="text-xs text-gray-500">{e.transportista}</p>
+                  <p className="text-xs text-gray-400">{e.destino}</p>
+                  {nextStatus(e.status) && (
+                    <button onClick={() => handleAdvance(e.id, nextStatus(e.status))}
+                            className="mt-2 w-full text-xs bg-blue-50 hover:bg-blue-100 text-blue-700
+                                       py-1 rounded transition-colors">
+                      → {nextStatus(e.status)}
+                    </button>
+                  )}
+                </div>
+              ))}
+              {byStatus(st).length === 0 && (
+                <p className="text-center text-gray-300 text-xs py-4">Vacío</p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
