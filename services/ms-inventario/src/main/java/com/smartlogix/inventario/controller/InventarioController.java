@@ -1,20 +1,26 @@
 package com.smartlogix.inventario.controller;
 
 import com.smartlogix.inventario.dto.ProductDTO;
+import com.smartlogix.inventario.dto.AlertaResponseDTO;
 import com.smartlogix.inventario.model.Producto;
 import com.smartlogix.inventario.service.ProductService;
+import com.smartlogix.inventario.service.AlertaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 @RestController
 @RequestMapping("/inventario")
 @RequiredArgsConstructor
+@Slf4j
 public class InventarioController {
 
     private final ProductService productService;
+    private final AlertaService alertaService;
 
     @GetMapping
     public ResponseEntity<List<ProductDTO>> getAll() {
@@ -44,7 +50,6 @@ public class InventarioController {
         return ResponseEntity.noContent().build();
     }
 
-    // Endpoint para Circuit Breaker de ms-pedidos
     @GetMapping("/{id}/stock")
     public ResponseEntity<Boolean> verificarStock(@PathVariable Long id,
                                                    @RequestParam int cantidad) {
@@ -56,14 +61,56 @@ public class InventarioController {
         }
     }
 
-    // RF-02: alertas de desabastecimiento
+    // Endpoint reemplazado: ahora retorna AlertaResponseDTO (Strategy)
     @GetMapping("/alertas")
-    public ResponseEntity<List<ProductDTO>> getAlertas() {
-        return ResponseEntity.ok(productService.getProductosBajoUmbral());
+    public ResponseEntity<AlertaResponseDTO> getAlertas() {
+        return ResponseEntity.ok(alertaService.getAlertas());
     }
 
     @GetMapping("/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("ms-inventario UP");
+    }
+
+    @PostMapping("/{id}/reservar")
+    public ResponseEntity<String> reservarStock(
+            @PathVariable Long id,
+            @RequestParam int cantidad,
+            @RequestParam(required = false) String sagaId) {
+
+        ProductDTO producto = productService.getProductById(id);
+
+        if (producto.getStockActual() < cantidad) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("Stock insuficiente: disponible=" + producto.getStockActual()
+                            + ", requerido=" + cantidad);
+        }
+
+        productService.decrementarStock(id, cantidad);
+        log.info("[Inventario] Stock reservado: productoId={}, cantidad={}, sagaId={}", id, cantidad, sagaId);
+        return ResponseEntity.ok("Stock reservado");
+    }
+
+    @PostMapping("/{id}/liberar")
+    public ResponseEntity<String> liberarStock(
+            @PathVariable Long id,
+            @RequestParam int cantidad,
+            @RequestParam(required = false) String sagaId) {
+
+        productService.incrementarStock(id, cantidad);
+        log.info("[Inventario] Stock liberado (compensación): productoId={}, cantidad={}, sagaId={}", id, cantidad, sagaId);
+        return ResponseEntity.ok("Stock liberado");
+    }
+
+    @GetMapping("/alertas/estrategia")
+    public ResponseEntity<AlertaResponseDTO> getAlertasConEstrategia(
+            @RequestParam(defaultValue = "umbralFijo") String estrategia) {
+        alertaService.setStrategy(estrategia);
+        return ResponseEntity.ok(alertaService.getAlertas());
+    }
+
+    @GetMapping("/alertas/estrategias")
+    public ResponseEntity<List<String>> getEstrategias() {
+        return ResponseEntity.ok(alertaService.getEstrategiasDisponibles());
     }
 }

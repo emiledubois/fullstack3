@@ -5,6 +5,7 @@ import com.smartlogix.inventario.model.Producto;
 import com.smartlogix.inventario.repository.InventarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -54,4 +55,32 @@ public class ProductService {
                 .map(ProductDTO::from)
                 .collect(Collectors.toList());
     }
+
+
+@Transactional
+public void decrementarStock(Long id, int cantidad) {
+    Producto p = inventarioRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Producto no encontrado: " + id));
+    if (p.getStockActual() < cantidad)
+        throw new RuntimeException("Stock insuficiente");
+    p.setStockActual(p.getStockActual() - cantidad);
+    inventarioRepository.save(p);
+}
+
+@Transactional
+public void incrementarStock(Long id, int cantidad) {
+    Producto p = inventarioRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Producto no encontrado: " + id));
+    p.setStockActual(p.getStockActual() + cantidad);
+    inventarioRepository.save(p);
+}
+
+
+
+
+
+
+
+
+
 }
