@@ -8,5 +8,10 @@ public class SagaStepException extends RuntimeException {
         this.stepName = stepName;
     }
 
+    public SagaStepException(String stepName, String message) {
+        super(message);
+        this.stepName = stepName;
+    }
+
     public String getStepName() { return stepName; }
 }

@@ -5,17 +5,13 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Type;
 import org.hibernate.annotations.UpdateTimestamp;
-
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 
 @Entity
 @Table(name = "saga_estado")
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@Data @Builder @NoArgsConstructor @AllArgsConstructor
 public class SagaEstado {
 
     @Id
@@ -23,16 +19,16 @@ public class SagaEstado {
     private UUID sagaId;
 
     @Column(nullable = false, length = 50)
-    private String tipo;
+    private String tipo;              // "CREAR_PEDIDO"
 
     @Column(nullable = false, length = 50)
-    private String pasoActual;
+    private String pasoActual;        // nombre del paso en ejecución
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private EstadoSaga estado;
+    private EstadoSaga estado;        // INICIADA, EN_PROGRESO, COMPLETADA, COMPENSANDO, FALLIDA
 
-    // Payload serializado como JSONB (el request original)
+    // El request original serializado como JSONB en PostgreSQL
     @Type(JsonBinaryType.class)
     @Column(columnDefinition = "jsonb", nullable = false)
     private Map<String, Object> payload;

@@ -1,16 +1,13 @@
 package com.smartlogix.pedidos.saga.steps;
 
 import com.smartlogix.pedidos.saga.*;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import java.util.Map;
 
-@Component
-@RequiredArgsConstructor
-@Slf4j
+@Component @Slf4j
 public class NotifyStep implements SagaStep {
 
     private final WebClient.Builder webClientBuilder;
@@ -18,38 +15,42 @@ public class NotifyStep implements SagaStep {
     @Value("${notification.service.url}")
     private String notificationUrl;
 
-    @Override
-    public String getName() { return "NOTIFICAR"; }
+    public NotifyStep(WebClient.Builder webClientBuilder) {
+        this.webClientBuilder = webClientBuilder;
+    }
+
+    @Override public String getName() { return "NOTIFICAR"; }
 
     @Override
     public void execute(SagaContext ctx) throws SagaStepException {
-        // La notificación es NO CRÍTICA: si falla, la saga sigue siendo exitosa.
-        // Aplicamos best-effort con try/catch que NO lanza SagaStepException.
+        // NO crítico: si falla, la saga igual se considera exitosa.
+        // Por eso NO lanzamos SagaStepException — solo logueamos.
         try {
             webClientBuilder.build()
                 .post()
                 .uri(notificationUrl + "/notificaciones")
                 .bodyValue(Map.of(
-                    "userEmail", ctx.getRequest().getUserEmail() != null
-                                 ? ctx.getRequest().getUserEmail() : "sin-email",
                     "pedidoId",  ctx.getPedidoId(),
-                    "envioId",   ctx.getEnvioId(),
+                    "envioId",   ctx.getEnvioId() != null ? ctx.getEnvioId() : 0L,
+                    "userEmail", ctx.getRequest().getUserEmail() != null
+                                  ? ctx.getRequest().getUserEmail() : "sin-email",
                     "sagaId",    ctx.getSagaId().toString(),
-                    "mensaje",   "Tu pedido #" + ctx.getPedidoId() + " ha sido confirmado."
+                    "mensaje",   "Pedido #" + ctx.getPedidoId() + " confirmado con envío #" + ctx.getEnvioId()
                 ))
                 .retrieve()
                 .toBodilessEntity()
                 .block();
-            log.info("[Saga {}] Notificación enviada a {}", ctx.getSagaId(), ctx.getRequest().getUserEmail());
+            log.info("[Saga {}] Notificación enviada", ctx.getSagaId());
         } catch (Exception e) {
-            // No crítico: registrar y continuar
-            log.warn("[Saga {}] Notificación falló (no crítico): {}. La saga se considera exitosa.", ctx.getSagaId(), e.getMessage());
+            // No crítico: registrar y continuar — NO lanzar SagaStepException
+            log.warn("[Saga {}] Notificación falló (no crítico, saga sigue exitosa): {}",
+                     ctx.getSagaId(), e.getMessage());
         }
     }
 
     @Override
     public void compensate(SagaContext ctx) {
-        // La notificación no tiene compensación real — si ya se envió, se enviaría
-        log.info("[Saga {}] Compensación de notificación: no aplica (paso no crítico)", ctx.getSagaId());
+        // Sin compensación real para notificaciones
+        log.info("[Saga {}] Paso NOTIFICAR: sin compensación aplicable", ctx.getSagaId());
     }
 }

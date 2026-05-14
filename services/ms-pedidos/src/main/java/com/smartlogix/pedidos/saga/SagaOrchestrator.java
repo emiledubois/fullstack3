@@ -10,8 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 
-@Service
-@Slf4j
+@Service @Slf4j
 public class SagaOrchestrator {
 
     private final SagaEstadoRepository sagaRepo;
@@ -20,23 +19,18 @@ public class SagaOrchestrator {
 
     public SagaOrchestrator(
             SagaEstadoRepository sagaRepo,
-            ObjectMapper mapper,
-            ReserveStockStep   step1,
-            CreateOrderStep    step2,
-            CreateShipmentStep step3,
-            NotifyStep         step4
-    ) {
+            ObjectMapper         mapper,
+            ReserveStockStep     step1,
+            CreateOrderStep      step2,
+            CreateShipmentStep   step3,
+            NotifyStep           step4) {
         this.sagaRepo = sagaRepo;
         this.mapper   = mapper;
-        // El orden importa: primero execute() en este orden,
-        // compensate() en orden inverso.
+        // El ORDEN de esta lista define el orden de ejecución.
+        // Las compensaciones se ejecutan en orden INVERSO.
         this.steps = List.of(step1, step2, step3, step4);
     }
 
-    /**
-     * Inicia y ejecuta la saga completa.
-     * Persistencia de estado en cada transición para tolerancia a fallos.
-     */
     @Transactional
     public SagaResultado ejecutar(CreatePedidoRequest request) {
         UUID sagaId = UUID.randomUUID();
@@ -45,21 +39,15 @@ public class SagaOrchestrator {
         // Persistir estado inicial
         Map<String, Object> payload = mapper.convertValue(request, new TypeReference<>() {});
         SagaEstado estado = SagaEstado.builder()
-            .sagaId(sagaId)
-            .tipo("CREAR_PEDIDO")
-            .pasoActual("INICIADA")
-            .estado(SagaEstado.EstadoSaga.INICIADA)
-            .payload(payload)
+            .sagaId(sagaId).tipo("CREAR_PEDIDO").pasoActual("INICIADA")
+            .estado(SagaEstado.EstadoSaga.INICIADA).payload(payload)
             .build();
         sagaRepo.save(estado);
 
-        // Contexto mutable que viaja por los pasos
         SagaContext ctx = SagaContext.builder()
-            .sagaId(sagaId)
-            .request(request)
-            .build();
+            .sagaId(sagaId).request(request).build();
 
-        // Ejecutar pasos secuencialmente
+        // ── FASE DE EJECUCIÓN ──
         int pasoFallido = -1;
         String errorMsg = null;
 
@@ -73,35 +61,38 @@ public class SagaOrchestrator {
                 step.execute(ctx);
 
                 // Actualizar IDs en el estado persistido
-                if (ctx.getPedidoId()  != null) estado.setPedidoId(ctx.getPedidoId());
-                if (ctx.getEnvioId()   != null) estado.setEnvioId(ctx.getEnvioId());
-                if (ctx.getProductoId() != null) estado.setStockReservado(true);
+                if (ctx.getProductoId()  != null) estado.setStockReservado(true);
+                if (ctx.getPedidoId()    != null) estado.setPedidoId(ctx.getPedidoId());
+                if (ctx.getEnvioId()     != null) estado.setEnvioId(ctx.getEnvioId());
                 sagaRepo.save(estado);
 
-                log.info("[Saga {}] Paso {} completado", sagaId, step.getName());
+                log.info("[Saga {}] Paso {} COMPLETADO", sagaId, step.getName());
             } catch (SagaStepException e) {
                 pasoFallido = i;
                 errorMsg = e.getMessage();
-                log.error("[Saga {}] Fallo en paso {}: {}", sagaId, step.getName(), errorMsg);
+                log.error("[Saga {}] Paso {} FALLIDO: {}", sagaId, step.getName(), errorMsg);
                 break;
             }
         }
 
-        // Si hubo fallo, compensar en orden inverso
+        // ── FASE DE COMPENSACIÓN (si hubo fallo) ──
         if (pasoFallido >= 0) {
             estado.setEstado(SagaEstado.EstadoSaga.COMPENSANDO);
             estado.setUltimoError(errorMsg);
             sagaRepo.save(estado);
 
             log.warn("[Saga {}] Iniciando compensaciones desde paso {}", sagaId, pasoFallido);
+
+            // Compensar en orden INVERSO desde el paso que falló
             for (int i = pasoFallido; i >= 0; i--) {
-                SagaStep step = steps.get(i);
                 try {
-                    log.warn("[Saga {}] Compensando: {}", sagaId, step.getName());
+                    SagaStep step = steps.get(i);
+                    log.warn("[Saga {}] Compensando paso: {}", sagaId, step.getName());
                     step.compensate(ctx);
                 } catch (Exception e) {
-                    // Las compensaciones no deben lanzar — ya lo manejan internamente
-                    log.error("[Saga {}] Error inesperado en compensación de {}: {}", sagaId, step.getName(), e.getMessage());
+                    // Las compensaciones no deben interrumpir el proceso
+                    log.error("[Saga {}] Error inesperado en compensación {}: {}",
+                             sagaId, steps.get(i).getName(), e.getMessage());
                 }
             }
 
@@ -109,15 +100,21 @@ public class SagaOrchestrator {
             estado.setPasoActual("FALLIDA");
             sagaRepo.save(estado);
 
+            log.warn("[Saga {}] FALLIDA y compensada", sagaId);
             return SagaResultado.fallo(sagaId, errorMsg);
         }
 
-        // Saga completada exitosamente
+        // ── SAGA COMPLETADA EXITOSAMENTE ──
         estado.setEstado(SagaEstado.EstadoSaga.COMPLETADA);
         estado.setPasoActual("COMPLETADA");
         sagaRepo.save(estado);
 
-        log.info("[Saga {}] COMPLETADA — pedidoId={}, envioId={}", sagaId, ctx.getPedidoId(), ctx.getEnvioId());
+        log.info("[Saga {}] COMPLETADA — pedidoId={}, envioId={}",
+                 sagaId, ctx.getPedidoId(), ctx.getEnvioId());
         return SagaResultado.exito(sagaId, ctx.getPedidoId(), ctx.getEnvioId());
+    }
+
+    public Optional<SagaEstado> consultarEstado(UUID sagaId) {
+        return sagaRepo.findById(sagaId);
     }
 }

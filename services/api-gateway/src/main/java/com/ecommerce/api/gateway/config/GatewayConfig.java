@@ -53,4 +53,16 @@ public class GatewayConfig {
             .filter(authFilter)
             .build();
     }
+
+// Ruta para la Saga — apunta al mismo ms-pedidos, protegida con JWT
+@Bean
+public RouterFunction<ServerResponse> sagasRoute() {
+    return GatewayRouterFunctions.route("sagas")
+        .route(path("/api/sagas/**"), HandlerFunctions.http("http://ms-pedidos:8083"))
+        .filter(stripPrefix(1))
+        .filter(authFilter)
+        .build();
+}
+
+
 }

@@ -4,8 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 import java.util.UUID;
 
-@Data
-@Builder
+@Data @Builder
 public class SagaResultado {
     private UUID    sagaId;
     private boolean exitoso;
@@ -13,16 +12,16 @@ public class SagaResultado {
     private Long    envioId;
     private String  error;
 
-    public static SagaResultado exito(UUID sagaId, Long pedidoId, Long envioId) {
+    public static SagaResultado exito(UUID id, Long pedidoId, Long envioId) {
         return SagaResultado.builder()
-            .sagaId(sagaId).exitoso(true)
+            .sagaId(id).exitoso(true)
             .pedidoId(pedidoId).envioId(envioId)
             .build();
     }
 
-    public static SagaResultado fallo(UUID sagaId, String error) {
+    public static SagaResultado fallo(UUID id, String error) {
         return SagaResultado.builder()
-            .sagaId(sagaId).exitoso(false).error(error)
+            .sagaId(id).exitoso(false).error(error)
             .build();
     }
 }

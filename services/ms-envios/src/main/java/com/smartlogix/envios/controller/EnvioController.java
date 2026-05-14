@@ -37,4 +37,13 @@ public class EnvioController {
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("ms-envios UP");
     }
+
+@DeleteMapping("/{id}/cancelar")
+public ResponseEntity<String> cancelarEnvio(
+        @PathVariable Long id,
+        @RequestParam(required = false) String sagaId) {
+    envioService.actualizarStatus(id, "CANCELADO");
+    return ResponseEntity.ok("Envío " + id + " cancelado (compensación saga=" + sagaId + ")");
+}
+
 }
