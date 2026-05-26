@@ -27,7 +27,7 @@ export default function Dashboard({ onNavigate }) {
       productos: inv.data,
       pedidos:   ped.data,
       envios:    env.data,
-      alertas:   alertas.data,
+      alertas:   alertas.data?.alertas ?? [],
     }))
     .catch(console.error)
     .finally(() => setLoading(false));

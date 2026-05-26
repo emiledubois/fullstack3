@@ -6,8 +6,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // En desarrollo: /api/* → http://localhost:8080/api/*
-      // Evita CORS en npm run dev
+      // Todas las peticiones /api/* se redirigen al gateway
+      // Esto hace que api.js use "/api" como baseURL (relativa)
+      // sin necesidad de especificar "http://localhost:8080"
       "/api": {
         target: "http://localhost:8080",
         changeOrigin: true,

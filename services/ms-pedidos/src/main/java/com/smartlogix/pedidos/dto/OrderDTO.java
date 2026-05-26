@@ -16,11 +16,15 @@ public class OrderDTO {
     private String        destino;
     private String        observaciones;
     private LocalDateTime creadoEn;
+    private Long 	  productoId;
+    private Integer	  cantidad;
 
     public static OrderDTO from(Pedido p) {
         return OrderDTO.builder()
                 .id(p.getId()).userId(p.getUserId())
                 .userEmail(p.getUserEmail()).clienteNombre(p.getClienteNombre())
+		.productoId(p.getProductoId())
+		.cantidad(p.getCantidad())
                 .total(p.getTotal()).status(p.getStatus())
                 .tipoPedido(p.getTipoPedido()).destino(p.getDestino())
                 .observaciones(p.getObservaciones()).creadoEn(p.getCreadoEn())

@@ -19,6 +19,12 @@ public class Pedido {
     @Column(nullable = false)
     private Double total;
 
+    @Column
+    private Long productoId;
+
+    @Column
+    private Integer cantidad;
+
     // Estados del flujo logístico SmartLogix
     @Column(nullable = false)
     private String status;            // PENDIENTE→APROBADO→EN_ENVIO→ENTREGADO→CANCELADO

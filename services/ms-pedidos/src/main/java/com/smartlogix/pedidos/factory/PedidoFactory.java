@@ -11,6 +11,8 @@ public class PedidoFactory {
         String tipo = req.getTipoPedido() != null
             ? req.getTipoPedido().toUpperCase() : "NACIONAL";
 
+        // Ahora los valores se pasan directamente a los builders
+
         return switch (tipo) {
             case "INTERNACIONAL" -> crearPedidoInternacional(req);
             default              -> crearPedidoNacional(req);
@@ -25,11 +27,12 @@ public class PedidoFactory {
             .total(req.getTotal())
             .tipoPedido("NACIONAL")
             .destino(req.getDestino())
+            .productoId(req.getProductoId())   
+            .cantidad(req.getCantidad())       
             .build();
     }
 
     private Pedido crearPedidoInternacional(CreatePedidoRequest req) {
-        // Pedido internacional tiene campos adicionales de SmartLogix
         return Pedido.builder()
             .userId(req.getUserId())
             .userEmail(req.getUserEmail())
@@ -38,6 +41,8 @@ public class PedidoFactory {
             .tipoPedido("INTERNACIONAL")
             .destino(req.getDestino())
             .observaciones("Pedido internacional — requiere documentación aduanera")
+            .productoId(req.getProductoId())   
+            .cantidad(req.getCantidad())       
             .build();
     }
 }
