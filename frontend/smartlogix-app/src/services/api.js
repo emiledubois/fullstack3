@@ -70,4 +70,8 @@ export const sagaAPI = {
   crearPedido: (data) => api.post("/sagas/pedido", data),
 };
 
+export const dashboardAPI = {
+  get: () => api.get("/dashboard"),
+};
+
 export default api;

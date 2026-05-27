@@ -53,6 +53,9 @@ services:
       - "8080:8080"
     environment:
       JWT_SECRET: bXlTZWN1cmVTZWNyZXRLZXkxMjM0NTY3ODkwQUJDREU=
+      INVENTARIO_URL: http://ms-inventario:8082
+      PEDIDOS_URL:    http://ms-pedidos:8083
+      ENVIOS_URL:     http://ms-envios:8084
     networks:
       - smartlogix-net
 

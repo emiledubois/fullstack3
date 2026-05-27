@@ -7,6 +7,7 @@ import org.springframework.context.annotation.*;
 import org.springframework.web.servlet.function.*;
 import static org.springframework.cloud.gateway.server.mvc.filter.FilterFunctions.stripPrefix;
 import static org.springframework.web.servlet.function.RequestPredicates.path;
+import org.springframework.web.servlet.function.RouterFunctions;
 
 @Configuration
 public class GatewayConfig {
@@ -64,5 +65,20 @@ public RouterFunction<ServerResponse> sagasRoute() {
         .build();
 }
 
+/**
+ * Ruta para el WebHub/BFF.
+ * /api/dashboard NO se enruta a ningún microservicio —
+ * lo atiende DashboardController directamente en el gateway.
+ * stripPrefix(1) elimina /api, dejando /dashboard
+ * que mapea al @RequestMapping("/dashboard") del controller.
+ */
+@Bean
+public RouterFunction<ServerResponse> dashboardRoute() {
+    return GatewayRouterFunctions.route("dashboard")
+        .route(path("/api/dashboard/**"), HandlerFunctions.http("http://localhost:8080"))
+        .filter(stripPrefix(1))
+        .filter(authFilter)
+        .build();
+}
 
 }
