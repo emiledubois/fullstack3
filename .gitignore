@@ -1,1 +1,5 @@
-target/\n.env\n*.log\n.idea/\n*.iml
+target/
+.env
+*.log
+.idea/
+*.iml
