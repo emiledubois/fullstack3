@@ -1,4 +1,4 @@
-version: "3.9"
+
 
 services:
   # ── Bases de datos (Database-per-Service) ──
@@ -146,8 +146,9 @@ services:
     build: ./services/ms-pagos
     ports: ["8086:8086"]
     dns:
-      - 8.8.8.8
-      - 8.8.4.4
+      - 10.239.200.81
+    extra_hosts:
+      - "sandbox.flow.cl:18.190.216.181"
     environment:
       DB_HOST:              postgres-pagos
       DB_NAME:              pagos_db
