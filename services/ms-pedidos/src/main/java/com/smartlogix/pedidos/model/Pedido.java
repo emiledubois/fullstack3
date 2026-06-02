@@ -4,6 +4,11 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+// "PENDIENTE_PAGO"  — creado, esperando confirmación de Flow
+// "PAGADO"          — Flow confirmó el pago, Saga disparada
+// "PAGO_RECHAZADO"  — Flow rechazó el pago
+// "PAGO_ANULADO"    — Flow anuló el pago
+
 @Entity @Table(name = "pedidos")
 @Data @NoArgsConstructor @AllArgsConstructor @Builder
 public class Pedido {

@@ -46,6 +46,20 @@ services:
     networks:
       - smartlogix-net
 
+  postgres-pagos:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB:       pagos_db
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - pagos_data:/var/lib/postgresql/data
+    networks: [smartlogix-net]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U postgres"]
+      interval: 10s
+      retries: 5
+
   # ── Microservicios ──
   api-gateway:
     build: ./services/api-gateway
@@ -56,6 +70,7 @@ services:
       INVENTARIO_URL: http://ms-inventario:8082
       PEDIDOS_URL:    http://ms-pedidos:8083
       ENVIOS_URL:     http://ms-envios:8084
+      PAGOS_URL:      http://ms-pagos:8086 
     networks:
       - smartlogix-net
 
@@ -127,6 +142,33 @@ services:
     networks:
       - smartlogix-net
 
+  ms-pagos:
+    build: ./services/ms-pagos
+    ports: ["8086:8086"]
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    environment:
+      DB_HOST:              postgres-pagos
+      DB_NAME:              pagos_db
+      DB_USER:              postgres
+      DB_PASS:              secret
+      # Flow API — Sandbox (reemplazar con credenciales reales)
+      FLOW_API_URL:         https://sandbox.flow.cl/api
+      FLOW_API_KEY:         ${FLOW_API_KEY}
+      FLOW_SECRET_KEY:      ${FLOW_SECRET_KEY}
+      # Webhook URL — necesita ser pública. En desarrollo: ngrok
+      FLOW_URL_CONFIRMATION: ${FLOW_URL_CONFIRMATION}
+      FLOW_URL_RETURN:      http://localhost:5173/pago-resultado
+      PEDIDOS_URL:          http://ms-pedidos:8083
+    depends_on:
+      postgres-pagos:
+        condition: service_healthy
+      ms-pedidos:
+        condition: service_started
+    networks: [smartlogix-net]
+
+
   frontend:
     build: ./frontend/smartlogix-app
     ports:
@@ -135,13 +177,13 @@ services:
       - api-gateway
     networks:
       - smartlogix-net
-
+  
 volumes:
   auth-data: {}
   inventario-data: {}
   pedidos-data: {}
   envios-data: {}
-
+  pagos_data: 
 networks:
   smartlogix-net:
     driver: bridge

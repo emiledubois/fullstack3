@@ -3,29 +3,13 @@ package com.smartlogix.pedidos.controller;
 import com.smartlogix.pedidos.dto.CreatePedidoRequest;
 import com.smartlogix.pedidos.dto.OrderDTO;
 import com.smartlogix.pedidos.facade.LogisticaFacade;
+import com.smartlogix.pedidos.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
-/**
- * CLIENTE DEL PATRÓN FACADE
- *
- * OrderController es el "Cliente" del diagrama del PDF.
- * Del PDF: "El Cliente utiliza la fachada en lugar de invocar
- * directamente los objetos del subsistema."
- *
- * ANTES (sin Facade): el controller conocía OrderService que conocía
- *   InventarioClient + PedidoFactory + OrderRepository + EventPublisher.
- *
- * AHORA (con Facade): el controller solo conoce LogisticaFacade.
- *   Llama a facade.procesarCreacionPedido() — UNA SOLA LLAMADA.
- *   No sabe nada de Circuit Breaker, Factory Method, ni Observer.
- *
- * Del PDF (analogía): el cliente llama al operador telefónico (fachada).
- *   El operador coordina Almacén, Empaquetado y Entrega internamente.
- */
 @RestController
 @RequestMapping("/pedidos")
 @RequiredArgsConstructor
@@ -34,6 +18,7 @@ public class OrderController {
 
     // El controller solo conoce la FACHADA — no los subsistemas
     private final LogisticaFacade logisticaFacade;
+    private final OrderService orderService;
 
     /**
      * Crear pedido — una sola llamada a la fachada.
@@ -60,5 +45,29 @@ public class OrderController {
     @GetMapping("/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("ms-pedidos UP (Facade activo)");
+    }
+
+    /**
+     * Llamado internamente por ms-pagos cuando Flow confirma el pago.
+     * Cambia el estado del pedido a PAGADO y dispara la Saga.
+     * No pasa por el JWT del gateway — es comunicación interna.
+     */
+    @PostMapping("/{id}/confirmar-pago")
+    public ResponseEntity<String> confirmarPago(
+            @PathVariable Long id,
+            @RequestParam String token) {
+        orderService.confirmarPagoYDispararSaga(id, token);
+        return ResponseEntity.ok("Saga disparada para pedido " + id);
+    }
+
+    /**
+     * Llamado si el pago fue rechazado o anulado por Flow
+     */
+    @PostMapping("/{id}/pago-fallido")
+    public ResponseEntity<String> pagoFallido(
+            @PathVariable Long id,
+            @RequestParam String estado) {
+        orderService.marcarPagoFallido(id, estado);
+        return ResponseEntity.ok("Pedido " + id + " actualizado a " + estado);
     }
 }
