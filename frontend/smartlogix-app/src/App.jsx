@@ -1,27 +1,33 @@
 import { useState } from "react";
-import Dashboard  from "./pages/Dashboard";
-import Inventario from "./pages/Inventario";
-import Pedidos    from "./pages/Pedidos";
-import Envios     from "./pages/Envios";
-import Login      from "./pages/Login";
+import Dashboard     from "./pages/Dashboard";
+import Inventario    from "./pages/Inventario";
+import Pedidos       from "./pages/Pedidos";
+import Envios        from "./pages/Envios";
+import Login         from "./pages/Login";
+import PagoResultado from "./pages/PagoResultado";
 
 const NAV = [
-  { key:"dashboard",  label:"Dashboard",   icon:"" },
-  { key:"inventario", label:"Inventario",  icon:"" },
-  { key:"pedidos",    label:"Pedidos",     icon:"" },
-  { key:"envios",     label:"Envíos",      icon:"" },
+  { key:"dashboard",  label:"Dashboard",  icon:"" },
+  { key:"inventario", label:"Inventario", icon:"" },
+  { key:"pedidos",    label:"Pedidos",    icon:"" },
+  { key:"envios",     label:"Envíos",     icon:"" },
 ];
 
 export default function App() {
   const [page, setPage] = useState("dashboard");
   const token = localStorage.getItem("token");
+
+  // Interceptar redirección de Flow ANTES de cualquier otra lógica
+  if (window.location.pathname === "/pago-resultado") {
+    return <PagoResultado />;
+  }
+
   if (!token) return <Login />;
 
   const logout = () => { localStorage.removeItem("token"); window.location.reload(); };
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
-
       {/* Sidebar */}
       <aside className="w-60 bg-blue-900 text-white flex flex-col shrink-0">
         {/* Logo */}
@@ -34,7 +40,6 @@ export default function App() {
             </div>
           </div>
         </div>
-
         {/* Nav items */}
         <nav className="flex-1 p-3 space-y-1">
           {NAV.map(n => (
@@ -53,7 +58,6 @@ export default function App() {
             </button>
           ))}
         </nav>
-
         {/* User / logout */}
         <div className="p-3 border-t border-blue-800">
           <button onClick={logout}
@@ -63,7 +67,6 @@ export default function App() {
           </button>
         </div>
       </aside>
-
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">
         {page === "dashboard"  && <Dashboard  onNavigate={setPage} />}

@@ -74,4 +74,9 @@ export const dashboardAPI = {
   get: () => api.get("/dashboard"),
 };
 
+export const pagoAPI = {
+  crearPago: (data) => api.post("/pagos/crear", data),
+  consultarPago: (id) => api.get(`/pagos/${id}`),
+};
+
 export default api;
