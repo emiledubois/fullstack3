@@ -2,8 +2,8 @@ package com.smartlogix.inventario.service;
 
 import com.smartlogix.inventario.model.Producto;
 import com.smartlogix.inventario.repository.InventarioRepository;
-import com.smartlogix.inventario.service.strategy.AlertaStockStrategy;
-import com.smartlogix.inventario.service.strategy.UmbralFijoStrategy;
+import com.smartlogix.inventario.strategy.AlertaStockStrategy;
+import com.smartlogix.inventario.strategy.UmbralFijoStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,8 +29,8 @@ class AlertaServiceTest {
     void setUp() {
         Map<String, AlertaStockStrategy> strategies = Map.of(
             "umbralFijo",  new UmbralFijoStrategy(),
-            "porcentaje",  new com.smartlogix.inventario.service.strategy.PorcentajeStrategy(),
-            "critico",     new com.smartlogix.inventario.service.strategy.StockCriticoStrategy()
+            "porcentaje",  new com.smartlogix.inventario.strategy.PorcentajeStrategy(),
+            "critico",     new com.smartlogix.inventario.strategy.StockCriticoStrategy()
         );
         alertaService = new AlertaService(inventarioRepository, strategies);
     }
