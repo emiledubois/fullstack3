@@ -1,0 +1,87 @@
+package com.smartlogix.pedidos.controller;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smartlogix.pedidos.dto.CreatePedidoRequest;
+import com.smartlogix.pedidos.dto.OrderDTO;
+import com.smartlogix.pedidos.facade.LogisticaFacade;
+import com.smartlogix.pedidos.service.OrderService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@WebMvcTest(OrderController.class)
+class OrderControllerTest {
+
+    @Autowired private MockMvc       mockMvc;
+    @Autowired private ObjectMapper  objectMapper;
+    @MockBean  private LogisticaFacade logisticaFacade;
+    @MockBean  private OrderService  orderService;
+
+    @Test
+    void postPedidos_requestValido_retorna201ConOrderDTO() throws Exception {
+
+        // ARRANGE
+        // Preparar el request y el DTO de respuesta esperado
+        CreatePedidoRequest req = new CreatePedidoRequest();
+        req.setUserId(1L);
+        req.setUserEmail("test@t.cl");
+        req.setTotal(999.0);
+        req.setTipoPedido("NACIONAL");
+
+        OrderDTO dtoRespuesta = new OrderDTO();
+        dtoRespuesta.setId(1L);
+        dtoRespuesta.setStatus("PENDIENTE");
+        dtoRespuesta.setTipoPedido("NACIONAL");
+
+        // Simular que la fachada procesa el pedido correctamente
+        when(logisticaFacade.procesarCreacionPedido(any())).thenReturn(dtoRespuesta);
+
+        // ACT
+        // Realizar petición POST al endpoint
+        var resultado = mockMvc.perform(
+            post("/pedidos")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req))
+        );
+
+        // ASSERT
+        resultado
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.status").value("PENDIENTE"))
+            .andExpect(jsonPath("$.tipoPedido").value("NACIONAL"));
+    }
+
+    @Test
+    void postPedidos_stockInsuficiente_retornaCodigoError() throws Exception {
+
+        // ARRANGE
+        CreatePedidoRequest req = new CreatePedidoRequest();
+        req.setProductoId(5L);
+        req.setCantidad(999);
+        req.setTotal(100.0);
+
+        // Simular que la fachada lanza excepción por stock insuficiente
+        when(logisticaFacade.procesarCreacionPedido(any()))
+            .thenThrow(new RuntimeException(
+                "Stock insuficiente o servicio de inventario no disponible"));
+
+        // ACT
+        var resultado = mockMvc.perform(
+            post("/pedidos")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req))
+        );
+
+        // ASSERT
+        // El status debe ser 4xx (400, 409 según el handler configurado)
+        resultado.andExpect(status().is4xxClientError());
+    }
+}
