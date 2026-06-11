@@ -1,5 +1,7 @@
 package com.smartlogix.inventario.controller;
 
+
+import com.smartlogix.inventario.service.ProductService;
 import com.smartlogix.inventario.dto.AlertaResponseDTO;
 import com.smartlogix.inventario.service.AlertaService;
 import org.junit.jupiter.api.Test;
@@ -15,7 +17,13 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(InventarioController.class)
+@WebMvcTest(
+    value = InventarioController.class,
+    excludeAutoConfiguration = {
+        org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
+        org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration.class
+    }
+)
 @SuppressWarnings("deprecation") // Suprime warnings de @MockBean en versiones < 3.4
 class InventarioControllerTest {
 
@@ -24,6 +32,9 @@ class InventarioControllerTest {
 
     @MockBean
     private AlertaService alertaService;
+
+    @MockBean
+    private ProductService productService;
 
     @Test
     void getAlertasEstrategiaCritico_retorna200ConDTOFiltrado() throws Exception {

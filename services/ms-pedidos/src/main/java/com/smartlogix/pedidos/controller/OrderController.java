@@ -6,9 +6,11 @@ import com.smartlogix.pedidos.facade.LogisticaFacade;
 import com.smartlogix.pedidos.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus; 
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/pedidos")
@@ -70,4 +72,14 @@ public class OrderController {
         orderService.marcarPagoFallido(id, estado);
         return ResponseEntity.ok("Pedido " + id + " actualizado a " + estado);
     }
+
+
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<Map<String, String>> handleRuntimeException(RuntimeException ex) {
+        return ResponseEntity
+            .status(HttpStatus.CONFLICT)  // 409
+            .body(Map.of("error", ex.getMessage()));
+    }
+
 }
