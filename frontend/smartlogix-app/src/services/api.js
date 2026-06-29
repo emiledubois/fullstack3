@@ -79,4 +79,21 @@ export const pagoAPI = {
   consultarPago: (id) => api.get(`/pagos/${id}`),
 };
 
+// Formato moneda chilena: $12.500
+export const formatCLP = (monto) =>
+  new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    maximumFractionDigits: 0
+  }).format(monto ?? 0);
+
+// Formato fecha en zona horaria Chile
+export const formatFechaChile = (fecha) =>
+  fecha ? new Date(fecha).toLocaleString("es-CL", {
+    timeZone: "America/Santiago",
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit"
+  }) : "—";
+
+
 export default api;

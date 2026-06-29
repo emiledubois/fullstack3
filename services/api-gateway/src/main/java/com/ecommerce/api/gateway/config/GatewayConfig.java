@@ -8,6 +8,7 @@ import org.springframework.web.servlet.function.*;
 import static org.springframework.cloud.gateway.server.mvc.filter.FilterFunctions.stripPrefix;
 import static org.springframework.web.servlet.function.RequestPredicates.path;
 import org.springframework.web.servlet.function.RouterFunctions;
+import org.springframework.core.annotation.Order;
 
 @Configuration
 public class GatewayConfig {
@@ -83,6 +84,7 @@ public class GatewayConfig {
     }
 
     @Bean
+    @Order(2)
     public RouterFunction<ServerResponse> pagosRoute() {
         return GatewayRouterFunctions.route("pagos")
                 .route(path("/api/pagos/**"), HandlerFunctions.http("http://ms-pagos:8086"))
@@ -94,6 +96,7 @@ public class GatewayConfig {
     // IMPORTANTE: El webhook de Flow va por una ruta separada SIN authFilter
     // Flow llama al webhook sin JWT — se excluye del filtro
     @Bean
+    @Order(1)
     public RouterFunction<ServerResponse> webhookFlowRoute() {
         return GatewayRouterFunctions.route("webhook-flow")
                 .route(path("/api/pagos/webhook/flow"), HandlerFunctions.http("http://ms-pagos:8086"))

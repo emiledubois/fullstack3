@@ -146,9 +146,8 @@ services:
     build: ./services/ms-pagos
     ports: ["8086:8086"]
     dns:
-      - 10.239.200.81
-    extra_hosts:
-      - "sandbox.flow.cl:18.190.216.181"
+      - 8.8.8.8
+      - 8.8.4.4
     environment:
       DB_HOST:              postgres-pagos
       DB_NAME:              pagos_db
@@ -160,8 +159,9 @@ services:
       FLOW_SECRET_KEY:      ${FLOW_SECRET_KEY}
       # Webhook URL — necesita ser pública. En desarrollo: ngrok
       FLOW_URL_CONFIRMATION: ${FLOW_URL_CONFIRMATION}
-      FLOW_URL_RETURN:      http://localhost:5173/pago-resultado
+      FLOW_URL_RETURN:      ${FLOW_URL_RETURN}
       PEDIDOS_URL:          http://ms-pedidos:8083
+      FLOW_VERIFY_SIGNATURE: ${FLOW_VERIFY_SIGNATURE}
     depends_on:
       postgres-pagos:
         condition: service_healthy

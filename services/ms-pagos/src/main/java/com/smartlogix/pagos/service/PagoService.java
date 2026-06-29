@@ -20,11 +20,13 @@ import java.util.Optional;
 public class PagoService {
 
     private final PagoRepository pagoRepository;
-    private final FlowService flowService;
+    private final FlowService    flowService;
 
-    @Value("${flow.url.confirmation}") private String urlConfirmation;
-    @Value("${flow.url.return}")       private String urlReturn;
-    @Value("${pedidos.service.url}")   private String pedidosUrl;
+    @Value("${flow.url.confirmation}")       private String  urlConfirmation;
+    @Value("${flow.url.return}")             private String  urlReturn;
+    @Value("${pedidos.service.url}")         private String  pedidosUrl;
+    // false en sandbox (Flow no envía firma), true en producción
+    @Value("${flow.verify.signature:false}")  private boolean verifySignature;
 
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -35,7 +37,9 @@ public class PagoService {
 
         FlowService.FlowCreateResponse flowResp = flowService.crearOrden(
             commerceOrder,
-            req.getDescripcion() != null ? req.getDescripcion() : "Pedido SmartLogix #" + req.getPedidoId(),
+            req.getDescripcion() != null
+                ? req.getDescripcion()
+                : "Pedido SmartLogix #" + req.getPedidoId(),
             req.getMonto().intValue(),
             req.getEmail(),
             urlConfirmation,
@@ -68,37 +72,45 @@ public class PagoService {
             .build();
     }
 
-    // Paso 2: procesar webhook de confirmación de Flow
+    // Paso 2: procesar webhook de confirmación de Flow 
     @Transactional
     public void procesarWebhook(String token, String firma) {
-	log.info("[Pagos] Webhook recibido: token={}***",
-	    token.length() > 8 ? token.substring(0, 8) : "???");
+        log.info("[Pagos] Webhook recibido: token={}***",
+            token.length() > 8 ? token.substring(0, 8) : "???");
 
-	    //  firma obligatoria 
-        if (firma == null || firma.isBlank()) {
-	    log.error("[Pagos] Webhook rechazado: firma ausente. Token: {}***",
-	        token.length() > 8 ? token.substring(0, 8) : "???");
-	    throw new RuntimeException("Firma requerida en webhook de Flow");
+        // Verificación de firma: obligatoria en producción,
+        // opcional en sandbox (Flow Sandbox no siempre envía firma)
+        if (verifySignature) {
+            if (firma == null || firma.isBlank()) {
+                log.error("[Pagos] Webhook rechazado: firma ausente");
+                throw new RuntimeException("Firma requerida en webhook de Flow");
+            }
+            if (!flowService.verificarFirmaWebhook(token, firma)) {
+                log.error("[Pagos] Webhook rechazado: firma inválida");
+                throw new RuntimeException("Firma de webhook de Flow inválida");
+            }
+        } else {
+            log.warn("[Pagos] Verificación de firma DESACTIVADA (modo sandbox)");
         }
-	if (!flowService.verificarFirmaWebhook(token, firma)) {
-	    log.error("[Pagos] Webhook rechazado: firma inválida");
-	    throw new RuntimeException("Firma de webhook de Flow inválida");
-	}   
 
+        // Consultar estado real del pago en Flow
         FlowService.FlowStatusResponse estado = flowService.obtenerEstado(token);
 
+        // Buscar el pago por token
         Pago pago = pagoRepository.findByFlowToken(token)
             .orElseThrow(() -> new RuntimeException("[Pagos] Token no encontrado: " + token));
 
+        // Idempotencia: ignorar si ya fue procesado
         if (pago.getEstado() == Pago.EstadoPago.PAGADO
                 || pago.getEstado() == Pago.EstadoPago.RECHAZADO
                 || pago.getEstado() == Pago.EstadoPago.ANULADO) {
             log.info("[Pagos] Webhook duplicado ignorado. Token: {}***, Estado actual: {}",
                 token.length() > 8 ? token.substring(0, 8) : "???", pago.getEstado());
-             return; // Salir sin procesar — ya fue manejado
+            return;
         }
 
-
+        // Actualizar estado según código de Flow:
+        // 1=pendiente, 2=pagado, 3=rechazado, 4=anulado
         switch (estado.getStatus()) {
             case 2 -> {
                 pago.setEstado(Pago.EstadoPago.PAGADO);
@@ -136,7 +148,7 @@ public class PagoService {
         }
     }
 
-    // Notificar a ms-pedidos que el pago falló
+    // Notificar a ms-pedidos que el pago falló 
     @Async
     public void notificarPagoFallido(Long pedidoId, String nuevoEstado) {
         try {
@@ -147,8 +159,12 @@ public class PagoService {
         }
     }
 
-    // Consultar un pago por ID
+    // Consultas
     public Optional<Pago> buscarPorId(Long id) {
         return pagoRepository.findById(id);
+    }
+
+    public Optional<Pago> buscarPorToken(String token) {
+        return pagoRepository.findByFlowToken(token);
     }
 }

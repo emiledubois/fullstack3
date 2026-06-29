@@ -84,6 +84,8 @@ public class FlowService {
         params.forEach(body::add);
 
         log.info("[Flow] Creando orden de pago: commerceOrder={}", commerceOrder);
+        log.info("[Flow] urlReturn que se enviará a Flow: '{}'", urlReturn);
+        log.info("[Flow] urlConfirmation que se enviará a Flow: '{}'", urlConfirmation);
         ResponseEntity<FlowCreateResponse> response = restTemplate.postForEntity(
             flowUrl + "/payment/create",
             new HttpEntity<>(body, headers),
