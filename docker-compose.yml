@@ -66,7 +66,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      JWT_SECRET: bXlTZWN1cmVTZWNyZXRLZXkxMjM0NTY3ODkwQUJDREU=
+      JWT_SECRET: ${JWT_SECRET} 
       INVENTARIO_URL: http://ms-inventario:8082
       PEDIDOS_URL:    http://ms-pedidos:8083
       ENVIOS_URL:     http://ms-envios:8084
@@ -83,7 +83,7 @@ services:
       DB_NAME: auth_db
       DB_USER: postgres
       DB_PASS: secret
-      JWT_SECRET: bXlTZWN1cmVTZWNyZXRLZXkxMjM0NTY3ODkwQUJDREU=
+      JWT_SECRET: ${JWT_SECRET}
     depends_on:
       - postgres-auth
     networks:

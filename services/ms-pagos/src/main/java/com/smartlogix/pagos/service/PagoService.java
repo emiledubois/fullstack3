@@ -71,19 +71,33 @@ public class PagoService {
     // Paso 2: procesar webhook de confirmación de Flow
     @Transactional
     public void procesarWebhook(String token, String firma) {
-        log.info("[Pagos] Webhook recibido: token={}", token);
+	log.info("[Pagos] Webhook recibido: token={}***",
+	    token.length() > 8 ? token.substring(0, 8) : "???");
 
-        if (firma != null && !firma.isEmpty()) {
-            if (!flowService.verificarFirmaWebhook(token, firma)) {
-                log.error("[Pagos] Webhook rechazado: firma inválida");
-                return;
-            }
+	    //  firma obligatoria 
+        if (firma == null || firma.isBlank()) {
+	    log.error("[Pagos] Webhook rechazado: firma ausente. Token: {}***",
+	        token.length() > 8 ? token.substring(0, 8) : "???");
+	    throw new RuntimeException("Firma requerida en webhook de Flow");
         }
+	if (!flowService.verificarFirmaWebhook(token, firma)) {
+	    log.error("[Pagos] Webhook rechazado: firma inválida");
+	    throw new RuntimeException("Firma de webhook de Flow inválida");
+	}   
 
         FlowService.FlowStatusResponse estado = flowService.obtenerEstado(token);
 
         Pago pago = pagoRepository.findByFlowToken(token)
             .orElseThrow(() -> new RuntimeException("[Pagos] Token no encontrado: " + token));
+
+        if (pago.getEstado() == Pago.EstadoPago.PAGADO
+                || pago.getEstado() == Pago.EstadoPago.RECHAZADO
+                || pago.getEstado() == Pago.EstadoPago.ANULADO) {
+            log.info("[Pagos] Webhook duplicado ignorado. Token: {}***, Estado actual: {}",
+                token.length() > 8 ? token.substring(0, 8) : "???", pago.getEstado());
+             return; // Salir sin procesar — ya fue manejado
+        }
+
 
         switch (estado.getStatus()) {
             case 2 -> {

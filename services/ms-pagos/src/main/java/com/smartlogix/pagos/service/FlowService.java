@@ -1,5 +1,6 @@
 package com.smartlogix.pagos.service;
 
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -8,6 +9,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
+import java.security.MessageDigest;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
@@ -37,6 +39,17 @@ public class FlowService {
     @Value("${flow.api.secret}") private String secretKey;
 
     private final RestTemplate restTemplate = new RestTemplate();
+
+    @PostConstruct
+    public void validarConfiguracion() {
+        if (apiKey == null || apiKey.isBlank() || apiKey.startsWith("TU_")) {
+            throw new IllegalStateException("FLOW_API_KEY no configurado correctamente");
+        }
+        if (secretKey == null || secretKey.isBlank() || secretKey.startsWith("TU_")) {
+            throw new IllegalStateException("FLOW_SECRET_KEY no configurado correctamente");
+        }
+        log.info("[Flow] Configuración validada correctamente");
+    }
 
     // Crear orden de pago en Flow 
     // Fuente: developers.flow.cl — Creación de orden
@@ -112,14 +125,19 @@ public class FlowService {
     // Flow envía el token como POST. Verificar que viene de Flow firmando
     // con apiKey + token y comparando con el "s" del webhook.
     public boolean verificarFirmaWebhook(String token, String firmaRecibida) {
-        Map<String, String> params = new LinkedHashMap<>();
-        params.put("apiKey", apiKey);
-        params.put("token",  token);
-        String firmaEsperada = firmar(params);
-        boolean ok = firmaEsperada.equals(firmaRecibida);
-        if (!ok) log.warn("[Flow] FIRMA INVÁLIDA en webhook. Esperada={} Recibida={}",
-            firmaEsperada, firmaRecibida);
-        return ok;
+        Objects.requireNonNull(token, "token no puede ser null");
+        Objects.requireNonNull(firmaRecibida, "firmaRecibida no puede ser null");
+        try {
+            String firmaEsperada = firmar(Map.of("apiKey", apiKey, "token", token));
+            // Comparación de tiempo constante → evita timing attacks
+            return MessageDigest.isEqual(
+                 firmaEsperada.getBytes(StandardCharsets.UTF_8),
+                 firmaRecibida.getBytes(StandardCharsets.UTF_8)
+            );
+        } catch (Exception e) {
+            log.error("[Flow] Error verificando firma webhook: {}", e.getMessage());
+            return false;
+        }
     }
 
     // Algoritmo de firma HMAC-SHA256
