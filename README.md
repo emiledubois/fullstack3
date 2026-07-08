@@ -258,7 +258,14 @@ GET http://localhost:8086/actuator/health   # ms-pagos
 ```
 
 > Colección Postman completa con 29 endpoints disponible en `docs/SmartLogix_Postman_Collection.json`.
-
+> Health Check con curl completo
+curl http://localhost:8080/actuator/health   # gateway
+curl http://localhost:8081/actuator/health   # auth-service
+curl http://localhost:8082/actuator/health   # ms-inventario
+curl http://localhost:8083/actuator/health   # ms-pedidos
+curl http://localhost:8084/actuator/health   # ms-envios
+curl http://localhost:8085/actuator/health   # notification-service 
+curl http://localhost:8086/actuator/health   # ms-pagos
 ---
 
 ## Patrón Strategy — Cambio de estrategia en runtime
