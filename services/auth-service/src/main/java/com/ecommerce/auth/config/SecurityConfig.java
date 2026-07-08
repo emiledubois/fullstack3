@@ -20,11 +20,11 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Rutas públicas: register y login no requieren autenticación
                 .requestMatchers("/auth/register", "/auth/login").permitAll()
-                // Actuator health también público
                 .requestMatchers("/actuator/health").permitAll()
-                // Todo lo demás requiere autenticación
+                // Swagger UI y OpenAPI docs — públicos
+                .requestMatchers("/swagger-ui/**", "/swagger-ui.html",
+                                 "/v3/api-docs/**", "/v3/api-docs").permitAll()
                 .anyRequest().authenticated()
             );
         return http.build();
