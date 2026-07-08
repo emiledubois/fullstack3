@@ -263,7 +263,6 @@ GET http://localhost:8086/actuator/health   # ms-pagos
 
 
 ```bash
-curl http://localhost:8080/actuator/health   # gateway
 curl http://localhost:8081/actuator/health   # auth-service
 curl http://localhost:8082/actuator/health   # ms-inventario
 curl http://localhost:8083/actuator/health   # ms-pedidos
