@@ -258,7 +258,8 @@ GET http://localhost:8086/actuator/health   # ms-pagos
 ```
 
 > Colección Postman completa con 29 endpoints disponible en `docs/SmartLogix_Postman_Collection.json`.
-> Health Check con curl completo
+
+Health Check con curl completo
 curl http://localhost:8080/actuator/health   # gateway
 curl http://localhost:8081/actuator/health   # auth-service
 curl http://localhost:8082/actuator/health   # ms-inventario
