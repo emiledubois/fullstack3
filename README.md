@@ -257,7 +257,6 @@ GET http://localhost:8083/actuator/health   # ms-pedidos
 GET http://localhost:8086/actuator/health   # ms-pagos
 ```
 
-> Colección Postman completa con 29 endpoints disponible en `docs/SmartLogix_Postman_Collection.json`.
 
 ## Health Check con curl completo
 
@@ -446,14 +445,6 @@ docker compose down --volumes
 
 ---
 
-## Documentación adicional
-
-| Archivo | Descripción |
-|---------|-------------|
-| `docs/SmartLogix_Diagrama_Arquitectura.png` | Diagrama de arquitectura completo |
-| `docs/SmartLogix_Persistencia_de_Datos.pdf` | Descripción de persistencia y recursos JPA |
-| `docs/SmartLogix_Postman_Collection.json` | Colección Postman con los 29 endpoints |
-| `frontend/smartlogix-app/README.md` | Instrucciones del componente frontend |
 | `run_tests.fish` | Script de prueba integración Flow (end-to-end) |
 
 ---
