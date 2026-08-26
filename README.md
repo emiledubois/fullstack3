@@ -119,6 +119,7 @@ cd fullstack3/ecommerce_microservices
 # Crear archivo .env con las credenciales
 cat > .env << 'EOF'
 JWT_SECRET=tu_secreto_generado_con_openssl_rand_base64_64
+DB_PASS=tu_password_postgres_generado_con_openssl_rand_base64_32
 FLOW_API_KEY=tu_api_key_sandbox
 FLOW_SECRET_KEY=tu_secret_key_sandbox
 FLOW_API_URL=https://sandbox.flow.cl/api
@@ -223,7 +224,7 @@ POST /api/pedidos/{id}/pago-fallido?estado=XXX  → marcar pago rechazado/anulad
 ### Saga (transacción distribuida)
 ```
 POST /api/sagas/pedido   → crear pedido con Saga completa (4 pasos + compensaciones)
-GET  /sagas/{sagaId}     → consultar estado de una saga (directo a :8083)
+GET  /sagas/{sagaId}     → consultar estado de una saga (interno — ms-pedidos ya no publica su puerto al host, ver sección Seguridad; usar `docker compose exec ms-pedidos curl localhost:8083/sagas/{sagaId}`)
 ```
 
 ### Envíos
@@ -250,24 +251,28 @@ GET  /api/pagos/por-token/{token} → consultar estado de un pago por flowToken
 ```
 
 ### Health checks
+
+Solo `api-gateway` (8080) y `auth-service` (8081) publican su puerto al host. El resto de los microservicios **no** implementan su propia autenticación — confían en que el gateway ya validó el JWT — por lo que sus puertos se dejaron de publicar para que no puedan ser alcanzados saltándose el gateway (ver [Seguridad implementada](#seguridad-implementada)). Para revisarlos, entra por la red interna de Docker:
+
 ```
 GET http://localhost:8080/actuator/health   # gateway
-GET http://localhost:8082/actuator/health   # ms-inventario
-GET http://localhost:8083/actuator/health   # ms-pedidos
-GET http://localhost:8086/actuator/health   # ms-pagos
+GET http://localhost:8081/actuator/health   # auth-service
 ```
-
 
 ## Health Check con curl completo
 
-
 ```bash
+# Expuestos al host
+curl http://localhost:8080/actuator/health   # api-gateway
 curl http://localhost:8081/actuator/health   # auth-service
-curl http://localhost:8082/actuator/health   # ms-inventario
-curl http://localhost:8083/actuator/health   # ms-pedidos
-curl http://localhost:8084/actuator/health   # ms-envios
-curl http://localhost:8085/actuator/health   # notification-service 
-curl http://localhost:8086/actuator/health   # ms-pagos
+
+# Internos — solo alcanzables dentro de la red Docker (smartlogix-net)
+for svc_port in "ms-inventario:8082" "ms-pedidos:8083" "ms-envios:8084" "notification-service:8085" "ms-pagos:8086"; do
+  svc=${svc_port%%:*}; port=${svc_port##*:}
+  echo -n "$svc: "
+  docker compose exec "$svc" curl -s "localhost:$port/actuator/health"
+  echo
+done
 ```
 
 ---
@@ -384,12 +389,34 @@ end
 | Medida | Descripción |
 |--------|-------------|
 | JWT sin fallback hardcodeado | `jwt.secret=${JWT_SECRET}` — falla al arrancar si no está configurado |
-| Firma HMAC-SHA256 obligatoria | Webhook de Flow verifica firma en producción (`FLOW_VERIFY_SIGNATURE=true`) |
+| Algoritmo JWT fijado (HS256) | `JwtUtil` usa `verifyWith(SecretKey)` — sin riesgo de algorithm confusion / `alg: none` |
+| Firma HMAC-SHA256 obligatoria | Webhook de Flow verifica firma en producción (`flow.verify.signature=true` por defecto; `false` solo en `.env` de sandbox local) |
+| Comparación de tiempo constante | `MessageDigest.isEqual()` en verificación HMAC evita timing attacks |
 | Rate limiting en login | Resilience4j: máximo 5 intentos/60s por instancia, responde 429 |
 | CORS restringido | Headers permitidos explícitos, sin wildcard `*` |
 | Idempotencia en webhook | Pagos ya procesados se ignoran silenciosamente (evita doble cobro) |
-| Comparación de tiempo constante | `MessageDigest.isEqual()` en verificación HMAC evita timing attacks |
+| Microservicios internos sin puerto publicado | `ms-inventario`, `ms-pedidos`, `ms-envios`, `ms-pagos` y `notification-service` no implementan autenticación propia (confían en el `AuthFilter` del gateway) — sus puertos ya no se publican al host, solo son alcanzables por la red interna `smartlogix-net`. Antes de esto podían llamarse directamente saltándose el JWT (OWASP A01) |
+| Anti-spoofing de identidad en el gateway | `AuthFilter` elimina cualquier header `X-User-Email` enviado por el cliente antes de fijar el valor extraído del JWT verificado |
+| Validación de entrada (Bean Validation) | `@Valid` + `@NotBlank`/`@NotNull`/`@Positive`/`@Email`/`@Size` en los DTOs de request de todos los servicios (antes solo `ms-inventario` la tenía) |
+| Sin contraseña de BD por defecto | `DB_PASS` no tiene fallback — antes usaba `secret` hardcodeado en `docker-compose.yml` para las 5 bases de datos |
+| Cabeceras de seguridad HTTP | `nginx.conf` del frontend agrega `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` |
+| Sin inyección SQL | Todo el acceso a datos pasa por `JpaRepository` / consultas parametrizadas, sin queries nativas concatenadas |
 | `.env` fuera del repositorio | Credenciales nunca versionadas |
+
+**Limitaciones conocidas (roadmap, no bloqueantes para un proyecto estudiantil):**
+- El JWT del frontend se guarda en `localStorage` (`services/api.js`), lo que es explotable ante un XSS futuro — no se encontró ningún XSS hoy (sin `dangerouslySetInnerHTML`), pero la mitigación correcta (cookie `httpOnly` emitida por el gateway + CSRF) es un cambio de arquitectura, no un parche.
+- No hay autenticación servicio-a-servicio interna (mTLS o JWT de servicio) entre microservicios — la exposición externa ya se cerró, pero dentro de `smartlogix-net` un servicio comprometido podría llamar a otro sin credenciales adicionales.
+- El registro de usuario revela si un email ya existe (`AuthController`) — enumeración de usuarios de severidad baja; corregirlo bien requiere un flujo de verificación por email, fuera de alcance de un fix puntual.
+
+Ver mapeo completo a OWASP Top 10 y a la normativa chilena en [`docs/COMPLIANCE_CL.md`](docs/COMPLIANCE_CL.md).
+
+---
+
+## Equipo de desarrollo agéntico
+
+Este proyecto se construye y mantiene con un **equipo de agentes de IA recursivo y con roles separados** (arquitecto, desarrollador, revisor, QA) implementado sobre Claude Code, siguiendo Top 10 de OWASP y la normativa chilena de ciberseguridad/datos personales en cada fase del ciclo. Ver [`docs/AGENTIC_WORKFLOW.md`](docs/AGENTIC_WORKFLOW.md) para la metodología completa y cómo ejecutarlo (`/dev-cycle <feature>`).
+
+**CI/CD** ([`.github/workflows/`](.github/workflows/)): build + tests por servicio (matriz de los 7 módulos Maven + frontend), CodeQL (Java + JavaScript), escaneo de dependencias y de imágenes Docker con Trivy, detección de secretos con Gitleaks, y actualizaciones automáticas de dependencias con Dependabot.
 
 ---
 
@@ -398,6 +425,7 @@ end
 | Variable | Servicio | Descripción |
 |----------|----------|-------------|
 | `JWT_SECRET` | api-gateway, auth-service | Secreto HMAC-SHA256 para JWT (generar con `openssl rand -base64 64`) |
+| `DB_PASS` | Todos los Postgres + servicios con BD | Password de Postgres — **sin valor por defecto**, falla al levantar si no está en `.env` (generar con `openssl rand -base64 32`) |
 | `DB_HOST` / `DB_NAME` | Todos los servicios con BD | Host y nombre de BD (nombre del contenedor Docker) |
 | `INVENTARIO_URL` | ms-pedidos, api-gateway | URL de ms-inventario |
 | `ENVIOS_URL` | ms-pedidos, api-gateway | URL de ms-envios |
@@ -422,11 +450,12 @@ docker compose build ms-pagos && docker compose up -d ms-pagos
 # Ver logs de un servicio
 docker compose logs ms-pagos --tail=50 -f
 
-# Health check de todos los servicios
-for port in 8080 8082 8083 8086; do
-  echo -n "Puerto $port: "
-  curl -s http://localhost:$port/actuator/health | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])"
-done
+# Health check de todos los servicios (gateway/auth por host, el resto por red interna — ver sección Health checks)
+curl -s http://localhost:8080/actuator/health | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])"
+docker compose exec ms-inventario curl -s localhost:8082/actuator/health
+docker compose exec ms-pedidos    curl -s localhost:8083/actuator/health
+docker compose exec ms-envios     curl -s localhost:8084/actuator/health
+docker compose exec ms-pagos      curl -s localhost:8086/actuator/health
 
 # Auditar pagos en BD
 docker compose exec postgres-pagos psql -U postgres pagos_db \

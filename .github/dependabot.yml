@@ -1,0 +1,77 @@
+version: 2
+updates:
+  - package-ecosystem: "maven"
+    directory: "/services/api-gateway"
+    schedule:
+      interval: "weekly"
+    groups:
+      spring-boot:
+        patterns: ["org.springframework*"]
+
+  - package-ecosystem: "maven"
+    directory: "/services/auth-service"
+    schedule:
+      interval: "weekly"
+    groups:
+      spring-boot:
+        patterns: ["org.springframework*"]
+
+  - package-ecosystem: "maven"
+    directory: "/services/ms-inventario"
+    schedule:
+      interval: "weekly"
+    groups:
+      spring-boot:
+        patterns: ["org.springframework*"]
+
+  - package-ecosystem: "maven"
+    directory: "/services/ms-pedidos"
+    schedule:
+      interval: "weekly"
+    groups:
+      spring-boot:
+        patterns: ["org.springframework*"]
+
+  - package-ecosystem: "maven"
+    directory: "/services/ms-envios"
+    schedule:
+      interval: "weekly"
+    groups:
+      spring-boot:
+        patterns: ["org.springframework*"]
+
+  - package-ecosystem: "maven"
+    directory: "/services/notification-service"
+    schedule:
+      interval: "weekly"
+    groups:
+      spring-boot:
+        patterns: ["org.springframework*"]
+
+  - package-ecosystem: "maven"
+    directory: "/services/ms-pagos"
+    schedule:
+      interval: "weekly"
+    groups:
+      spring-boot:
+        patterns: ["org.springframework*"]
+
+  - package-ecosystem: "npm"
+    directory: "/frontend/smartlogix-app"
+    schedule:
+      interval: "weekly"
+    groups:
+      react:
+        patterns: ["react*"]
+
+  - package-ecosystem: "docker"
+    directories:
+      - "/services/*"
+      - "/frontend/smartlogix-app"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
