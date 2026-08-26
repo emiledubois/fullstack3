@@ -4,9 +4,10 @@ import com.smartlogix.pedidos.dto.CreatePedidoRequest;
 import com.smartlogix.pedidos.dto.OrderDTO;
 import com.smartlogix.pedidos.facade.LogisticaFacade;
 import com.smartlogix.pedidos.service.OrderService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus; 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -27,7 +28,7 @@ public class OrderController {
      * La fachada coordina los 4 subsistemas internamente.
      */
     @PostMapping
-    public ResponseEntity<OrderDTO> create(@RequestBody CreatePedidoRequest req) {
+    public ResponseEntity<OrderDTO> create(@Valid @RequestBody CreatePedidoRequest req) {
         // Del PDF: "el cliente tan solo incluye las funciones realmente
         // importantes para los clientes" — aquí es solo procesarCreacionPedido().
         OrderDTO resultado = logisticaFacade.procesarCreacionPedido(req);

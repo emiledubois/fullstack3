@@ -2,6 +2,7 @@ package com.smartlogix.envios.controller;
 
 import com.smartlogix.envios.dto.*;
 import com.smartlogix.envios.service.EnvioService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -13,7 +14,7 @@ public class EnvioController {
     private final EnvioService envioService;
 
     @PostMapping
-    public ResponseEntity<EnvioDTO> crear(@RequestBody CreateEnvioRequest req) {
+    public ResponseEntity<EnvioDTO> crear(@Valid @RequestBody CreateEnvioRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(envioService.crearEnvio(req));
     }
 

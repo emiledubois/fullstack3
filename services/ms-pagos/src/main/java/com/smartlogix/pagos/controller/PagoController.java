@@ -3,6 +3,7 @@ package com.smartlogix.pagos.controller;
 import com.smartlogix.pagos.dto.CrearPagoRequest;
 import com.smartlogix.pagos.dto.CrearPagoResponse;
 import com.smartlogix.pagos.service.PagoService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +18,7 @@ public class PagoController {
     private final PagoService pagoService;
 
     @PostMapping("/crear")
-    public ResponseEntity<CrearPagoResponse> crearPago(@RequestBody CrearPagoRequest req) {
+    public ResponseEntity<CrearPagoResponse> crearPago(@Valid @RequestBody CrearPagoRequest req) {
         return ResponseEntity.ok(pagoService.iniciarPago(req));
     }
 

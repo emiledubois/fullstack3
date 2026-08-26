@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: auth_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secret
+      POSTGRES_PASSWORD: ${DB_PASS}
     volumes:
       - auth-data:/var/lib/postgresql/data
     networks:
@@ -18,7 +18,7 @@ services:
     environment:
       POSTGRES_DB: inventario_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secret
+      POSTGRES_PASSWORD: ${DB_PASS}
     volumes:
       - inventario-data:/var/lib/postgresql/data
     networks:
@@ -29,7 +29,7 @@ services:
     environment:
       POSTGRES_DB: pedidos_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secret
+      POSTGRES_PASSWORD: ${DB_PASS}
     volumes:
       - pedidos-data:/var/lib/postgresql/data
     networks:
@@ -40,7 +40,7 @@ services:
     environment:
       POSTGRES_DB: envios_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secret
+      POSTGRES_PASSWORD: ${DB_PASS}
     volumes:
       - envios-data:/var/lib/postgresql/data
     networks:
@@ -51,7 +51,7 @@ services:
     environment:
       POSTGRES_DB:       pagos_db
       POSTGRES_USER:     postgres
-      POSTGRES_PASSWORD: secret
+      POSTGRES_PASSWORD: ${DB_PASS}
     volumes:
       - pagos_data:/var/lib/postgresql/data
     networks: [smartlogix-net]
@@ -82,22 +82,27 @@ services:
       DB_HOST: postgres-auth
       DB_NAME: auth_db
       DB_USER: postgres
-      DB_PASS: secret
+      DB_PASS: ${DB_PASS}
       JWT_SECRET: ${JWT_SECRET}
     depends_on:
       - postgres-auth
     networks:
       - smartlogix-net
 
+  # NOTE: ms-inventario, ms-pedidos, ms-envios, notification-service and ms-pagos
+  # intentionally have NO "ports:" mapping to the host. None of them implement their
+  # own authentication (they trust the api-gateway's AuthFilter to validate the JWT
+  # before a request ever reaches them). Publishing their ports to the host would let
+  # anyone bypass the gateway entirely and hit them unauthenticated (OWASP A01:2021 -
+  # Broken Access Control). They remain reachable from each other and from the gateway
+  # via the internal "smartlogix-net" Docker network using their service name as host.
   ms-inventario:
     build: ./services/ms-inventario
-    ports:
-      - "8082:8082"
     environment:
       DB_HOST: postgres-inventario
       DB_NAME: inventario_db
       DB_USER: postgres
-      DB_PASS: secret
+      DB_PASS: ${DB_PASS}
     depends_on:
       - postgres-inventario
     networks:
@@ -105,13 +110,11 @@ services:
 
   ms-pedidos:
     build: ./services/ms-pedidos
-    ports:
-      - "8083:8083"
     environment:
       DB_HOST: postgres-pedidos
       DB_NAME: pedidos_db
       DB_USER: postgres
-      DB_PASS: secret
+      DB_PASS: ${DB_PASS}
       INVENTARIO_URL: http://ms-inventario:8082
       ENVIOS_URL: http://ms-envios:8084
       NOTIFICATION_URL: http://notification-service:8085
@@ -123,13 +126,11 @@ services:
 
   ms-envios:
     build: ./services/ms-envios
-    ports:
-      - "8084:8084"
     environment:
       DB_HOST: postgres-envios
       DB_NAME: envios_db
       DB_USER: postgres
-      DB_PASS: secret
+      DB_PASS: ${DB_PASS}
     depends_on:
       - postgres-envios
     networks:
@@ -137,14 +138,11 @@ services:
 
   notification-service:
     build: ./services/notification-service
-    ports:
-      - "8085:8085"
     networks:
       - smartlogix-net
 
   ms-pagos:
     build: ./services/ms-pagos
-    ports: ["8086:8086"]
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -152,7 +150,7 @@ services:
       DB_HOST:              postgres-pagos
       DB_NAME:              pagos_db
       DB_USER:              postgres
-      DB_PASS:              secret
+      DB_PASS:              ${DB_PASS}
       # Flow API — Sandbox (reemplazar con credenciales reales)
       FLOW_API_URL:         https://sandbox.flow.cl/api
       FLOW_API_KEY:         ${FLOW_API_KEY}

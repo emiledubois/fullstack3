@@ -35,6 +35,10 @@ class SagaControllerTest {
         // ARRANGE
         CreatePedidoRequest req = new CreatePedidoRequest();
         req.setUserId(1L);
+        req.setUserEmail("test@t.cl");
+        req.setClienteNombre("Test Cliente");
+        req.setTipoPedido("NACIONAL");
+        req.setDestino("Santiago");
         req.setTotal(300.0);
         req.setProductoId(1L);
         req.setCantidad(2);
@@ -63,6 +67,11 @@ class SagaControllerTest {
 
         // ARRANGE
         CreatePedidoRequest req = new CreatePedidoRequest();
+        req.setUserId(1L);
+        req.setUserEmail("test@t.cl");
+        req.setClienteNombre("Test Cliente");
+        req.setTipoPedido("NACIONAL");
+        req.setDestino("Santiago");
         req.setTotal(300.0);
         req.setProductoId(1L);
         req.setCantidad(1);

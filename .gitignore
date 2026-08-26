@@ -3,3 +3,4 @@ target/
 *.log
 .idea/
 *.iml
+.claude/scheduled_tasks.lock

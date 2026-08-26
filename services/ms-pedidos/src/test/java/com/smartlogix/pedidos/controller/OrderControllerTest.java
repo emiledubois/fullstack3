@@ -39,8 +39,12 @@ class OrderControllerTest {
         CreatePedidoRequest req = new CreatePedidoRequest();
         req.setUserId(1L);
         req.setUserEmail("test@t.cl");
+        req.setClienteNombre("Test Cliente");
         req.setTotal(999.0);
         req.setTipoPedido("NACIONAL");
+        req.setDestino("Santiago");
+        req.setProductoId(1L);
+        req.setCantidad(1);
 
         OrderDTO dtoRespuesta = new OrderDTO();
         dtoRespuesta.setId(1L);
@@ -70,6 +74,11 @@ class OrderControllerTest {
 
         // ARRANGE
         CreatePedidoRequest req = new CreatePedidoRequest();
+        req.setUserId(1L);
+        req.setUserEmail("test@t.cl");
+        req.setClienteNombre("Test Cliente");
+        req.setTipoPedido("NACIONAL");
+        req.setDestino("Santiago");
         req.setProductoId(5L);
         req.setCantidad(999);
         req.setTotal(100.0);

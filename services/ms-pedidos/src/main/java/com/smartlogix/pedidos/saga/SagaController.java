@@ -1,6 +1,7 @@
 package com.smartlogix.pedidos.saga;
 
 import com.smartlogix.pedidos.dto.CreatePedidoRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
@@ -22,7 +23,7 @@ public class SagaController {
      * Si cualquier paso falla, se ejecutan compensaciones en orden inverso.
      */
     @PostMapping("/pedido")
-    public ResponseEntity<?> crearPedidoSaga(@RequestBody CreatePedidoRequest req) {
+    public ResponseEntity<?> crearPedidoSaga(@Valid @RequestBody CreatePedidoRequest req) {
         try {
             SagaResultado resultado = orchestrator.ejecutar(req);
             if (resultado.isExitoso()) {
