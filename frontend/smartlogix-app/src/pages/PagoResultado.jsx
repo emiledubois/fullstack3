@@ -96,7 +96,14 @@ export default function PagoResultado() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // Mount-triggered CSS transition (opacity/translate fade-in) — a
+    // recognized exception to react-hooks/set-state-in-effect, since there's
+    // no DOM/CSS-only way to defer the initial render past first paint.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
 
@@ -106,6 +113,8 @@ export default function PagoResultado() {
     if (!token) {
       // Flow redirigió sin token en la URL (lo envió en el body del POST).
       // El webhook ya procesó el pago en el backend — mostrar éxito directamente.
+      // Estado derivado de una lectura externa (URL), no de props/estado React.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEstado("PAGADO");
       return;
     }

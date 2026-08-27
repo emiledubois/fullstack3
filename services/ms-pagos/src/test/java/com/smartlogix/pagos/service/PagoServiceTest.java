@@ -80,6 +80,7 @@ class PagoServiceTest {
 
         // ARRANGE
         ReflectionTestUtils.setField(pagoService, "pedidosUrl", "http://ms-pedidos:8083");
+        ReflectionTestUtils.setField(pagoService, "verifySignature", true);
 
         String token = "TOKEN_OK_456";
         String firma = "firma_valida";

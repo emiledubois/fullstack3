@@ -1,77 +1,121 @@
 version: 2
 updates:
+  # Backend services (Maven) — one grouped PR per service per week for
+  # patch/minor bumps. Major-version bumps are proposed individually so they
+  # get a deliberate look rather than blending into the weekly group; the JVM
+  # stays pinned to the Java 17 LTS line intentionally (see docker entries
+  # below), so a Spring Boot major bump alone won't drag the runtime with it.
   - package-ecosystem: "maven"
     directory: "/services/api-gateway"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 3
     groups:
-      spring-boot:
-        patterns: ["org.springframework*"]
+      all-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: "maven"
     directory: "/services/auth-service"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 3
     groups:
-      spring-boot:
-        patterns: ["org.springframework*"]
+      all-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: "maven"
     directory: "/services/ms-inventario"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 3
     groups:
-      spring-boot:
-        patterns: ["org.springframework*"]
+      all-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: "maven"
     directory: "/services/ms-pedidos"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 3
     groups:
-      spring-boot:
-        patterns: ["org.springframework*"]
+      all-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: "maven"
     directory: "/services/ms-envios"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 3
     groups:
-      spring-boot:
-        patterns: ["org.springframework*"]
+      all-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: "maven"
     directory: "/services/notification-service"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 3
     groups:
-      spring-boot:
-        patterns: ["org.springframework*"]
+      all-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: "maven"
     directory: "/services/ms-pagos"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 3
     groups:
-      spring-boot:
-        patterns: ["org.springframework*"]
+      all-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
 
+  # Frontend (npm) — grouped patch/minor PR weekly. Tailwind and ESLint are
+  # excluded from major bumps: both ship breaking config-format changes
+  # (Tailwind v4's CSS-based config, ESLint's flat-config differences) that
+  # need a deliberate, tested migration, not an auto-merge-shaped PR.
   - package-ecosystem: "npm"
     directory: "/frontend/smartlogix-app"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
     groups:
-      react:
-        patterns: ["react*"]
+      all-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint-plugin-*"
+        update-types: ["version-update:semver-major"]
 
+  # Docker base images — this project is deliberately pinned to the Java 17
+  # LTS line (every pom.xml sets <java.version>17</java.version>, matched by
+  # backend-ci.yml). A major bump here (e.g. 17-jre-alpine -> 25-jre-alpine)
+  # changes the JVM Spring Boot actually runs on without changing what the
+  # code is compiled/tested against — that's a deliberate, tested migration,
+  # not something to auto-merge. Patch-level base image refreshes still flow
+  # through normally.
   - package-ecosystem: "docker"
     directories:
       - "/services/*"
       - "/frontend/smartlogix-app"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
