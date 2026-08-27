@@ -3,6 +3,7 @@ import Dashboard     from "./pages/Dashboard";
 import Inventario    from "./pages/Inventario";
 import Pedidos       from "./pages/Pedidos";
 import Envios        from "./pages/Envios";
+import MisDatos      from "./pages/MisDatos";
 import Login         from "./pages/Login";
 import PagoResultado from "./pages/PagoResultado";
 import { authAPI, sessionAPI } from "./services/api";
@@ -12,6 +13,7 @@ const NAV = [
   { key:"inventario", label:"Inventario", icon:"" },
   { key:"pedidos",    label:"Pedidos",    icon:"" },
   { key:"envios",     label:"Envíos",     icon:"" },
+  { key:"mis-datos",  label:"Mis datos",  icon:"" },
 ];
 
 export default function App() {
@@ -105,6 +107,7 @@ export default function App() {
         {page === "inventario" && <Inventario />}
         {page === "pedidos"    && <Pedidos />}
         {page === "envios"     && <Envios />}
+        {page === "mis-datos"  && <MisDatos />}
       </main>
     </div>
   );

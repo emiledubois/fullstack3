@@ -72,6 +72,10 @@ export const dashboardAPI = {
   get: () => api.get("/dashboard"),
 };
 
+export const usuariosAPI = {
+  getMisDatos: () => api.get("/usuarios/me/datos"),
+};
+
 export const pagoAPI = {
   crearPago: (data) => api.post("/pagos/crear", data),
   consultarPago: (id) => api.get(`/pagos/${id}`),
