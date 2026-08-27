@@ -84,6 +84,7 @@ services:
       DB_USER: postgres
       DB_PASS: ${DB_PASS}
       JWT_SECRET: ${JWT_SECRET}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
     depends_on:
       - postgres-auth
     networks:

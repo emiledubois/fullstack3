@@ -86,7 +86,7 @@ ecommerce_microservices/
 │           │   ├── Pedidos.jsx         # Carrito multi-producto, búsqueda por SKU
 │           │   ├── Envios.jsx
 │           │   └── PagoResultado.jsx   # Página de retorno desde Flow (estados: PAGADO/RECHAZADO/ANULADO/PENDIENTE)
-│           └── services/api.js    # Axios + interceptor JWT + dashboardAPI + pagoAPI
+│           └── services/api.js    # Axios (withCredentials, cookie httpOnly) + dashboardAPI + pagoAPI
 └── services/
     ├── api-gateway/              # Spring Cloud Gateway MVC + BFF, puerto 8080
     ├── auth-service/             # JWT auth + Rate Limiter en /login, puerto 8081
@@ -126,6 +126,7 @@ FLOW_API_URL=https://sandbox.flow.cl/api
 FLOW_URL_CONFIRMATION=https://TU_NGROK.ngrok-free.app/pagos/webhook/flow
 FLOW_URL_RETURN=http://localhost:5173/pago-resultado
 FLOW_VERIFY_SIGNATURE=false
+COOKIE_SECURE=false
 EOF
 
 # Construir y levantar todos los servicios
@@ -176,28 +177,40 @@ docker compose up -d ms-pagos
 
 ## Primer uso
 
+El JWT ya no se devuelve en el body de `/auth/login` — se fija como cookie
+`httpOnly` (`sl_jwt`), así que los ejemplos de `curl` usan un **cookie jar**
+(`-c`/`-b`) en vez de capturar un `$TOKEN` para el header `Authorization`.
+
 ```bash
 # Registrar usuario administrador
 curl -X POST http://localhost:8080/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@smartlogix.cl","password":"Password123!"}'
 
-# Iniciar sesión y capturar token
-TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+# Iniciar sesión — guarda la cookie sl_jwt en cookies.txt
+curl -c cookies.txt -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@smartlogix.cl","password":"Password123!"}' | tr -d '"')
+  -d '{"email":"admin@smartlogix.cl","password":"Password123!"}'
+
+# Peticiones siguientes: reenviar la cookie con -b
+curl -b cookies.txt http://localhost:8080/api/session
+
+# Cerrar sesión (invalida la cookie del lado del navegador)
+curl -b cookies.txt -c cookies.txt -X POST http://localhost:8080/api/auth/logout
 ```
 
 ---
 
 ## API Endpoints principales
 
-Todos los endpoints (excepto `/api/auth/*` y el webhook de Flow) requieren header `Authorization: Bearer <token>`.
+Todos los endpoints (excepto `/api/auth/*` y el webhook de Flow) requieren la cookie `httpOnly` `sl_jwt` (fijada por `/api/auth/login`, ver sección "Primer uso"). El navegador la adjunta automáticamente en cada petición — los ejemplos de `curl` de esta sección usan `-b cookies.txt`.
 
 ### Autenticación
 ```
 POST /api/auth/register   → registrar usuario
-POST /api/auth/login      → obtener JWT (rate limited: 5 intentos/minuto)
+POST /api/auth/login      → login — fija la cookie httpOnly sl_jwt (rate limited: 5 intentos/minuto)
+POST /api/auth/logout     → cierra sesión — expira la cookie sl_jwt
+GET  /api/session         → { email, role } de la sesión activa, o 401 si no hay cookie válida
 ```
 
 ### Inventario
@@ -281,15 +294,15 @@ done
 
 ```bash
 # Umbral fijo (por defecto): alerta cuando stock < umbralMinimo
-curl http://localhost:8080/api/inventario/alertas -H "Authorization: Bearer $TOKEN"
+curl -b cookies.txt http://localhost:8080/api/inventario/alertas
 
 # Porcentaje: alerta cuando stock < umbralMinimo * 1.5
-curl "http://localhost:8080/api/inventario/alertas/estrategia?estrategia=porcentaje" \
-  -H "Authorization: Bearer $TOKEN"
+curl -b cookies.txt \
+  "http://localhost:8080/api/inventario/alertas/estrategia?estrategia=porcentaje"
 
 # Crítico: alerta solo cuando stock == 0
-curl "http://localhost:8080/api/inventario/alertas/estrategia?estrategia=critico" \
-  -H "Authorization: Bearer $TOKEN"
+curl -b cookies.txt \
+  "http://localhost:8080/api/inventario/alertas/estrategia?estrategia=critico"
 ```
 
 ---
@@ -298,8 +311,7 @@ curl "http://localhost:8080/api/inventario/alertas/estrategia?estrategia=critico
 
 ```bash
 # Ejecutar Saga completa (4 pasos: reservar stock → crear pedido → crear envío → notificar)
-curl -X POST http://localhost:8080/api/sagas/pedido \
-  -H "Authorization: Bearer $TOKEN" \
+curl -b cookies.txt -X POST http://localhost:8080/api/sagas/pedido \
   -H "Content-Type: application/json" \
   -d '{"userId":1,"userEmail":"cliente@pyme.cl","clienteNombre":"Juan Pérez",
        "total":999.99,"tipoPedido":"NACIONAL","destino":"Santiago",
@@ -349,11 +361,11 @@ fish run_tests.fish
 
 ```bash
 # Una sola petición reemplaza 4 llamadas independientes
-curl http://localhost:8080/api/dashboard -H "Authorization: Bearer $TOKEN"
+curl -b cookies.txt http://localhost:8080/api/dashboard
 
 # Demostrar tolerancia a fallos parciales
 docker compose stop ms-envios
-curl http://localhost:8080/api/dashboard -H "Authorization: Bearer $TOKEN"
+curl -b cookies.txt http://localhost:8080/api/dashboard
 # Responde igual: ultimosEnvios:[], estadoServicios:"PARCIAL"
 docker compose start ms-envios
 ```
@@ -397,6 +409,7 @@ end
 | Idempotencia en webhook | Pagos ya procesados se ignoran silenciosamente (evita doble cobro) |
 | Microservicios internos sin puerto publicado | `ms-inventario`, `ms-pedidos`, `ms-envios`, `ms-pagos` y `notification-service` no implementan autenticación propia (confían en el `AuthFilter` del gateway) — sus puertos ya no se publican al host, solo son alcanzables por la red interna `smartlogix-net`. Antes de esto podían llamarse directamente saltándose el JWT (OWASP A01) |
 | Anti-spoofing de identidad en el gateway | `AuthFilter` elimina cualquier header `X-User-Email` enviado por el cliente antes de fijar el valor extraído del JWT verificado |
+| JWT en cookie `httpOnly` (no `localStorage`) | `auth-service` fija el JWT vía `Set-Cookie: sl_jwt=...; HttpOnly; Secure; SameSite=Lax` — JS nunca lo lee ni lo puede exfiltrar ante un XSS futuro. `AuthFilter` lo valida desde la cookie y la elimina antes de reenviar a `ms-inventario`/`ms-pedidos`/`ms-envios`/`ms-pagos` (mismo patrón de minimización que `X-User-Email`) |
 | Validación de entrada (Bean Validation) | `@Valid` + `@NotBlank`/`@NotNull`/`@Positive`/`@Email`/`@Size` en los DTOs de request de todos los servicios (antes solo `ms-inventario` la tenía) |
 | Sin contraseña de BD por defecto | `DB_PASS` no tiene fallback — antes usaba `secret` hardcodeado en `docker-compose.yml` para las 5 bases de datos |
 | Cabeceras de seguridad HTTP | `nginx.conf` del frontend agrega `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` |
@@ -404,7 +417,7 @@ end
 | `.env` fuera del repositorio | Credenciales nunca versionadas |
 
 **Limitaciones conocidas (roadmap, no bloqueantes para un proyecto estudiantil):**
-- El JWT del frontend se guarda en `localStorage` (`services/api.js`), lo que es explotable ante un XSS futuro — no se encontró ningún XSS hoy (sin `dangerouslySetInnerHTML`), pero la mitigación correcta (cookie `httpOnly` emitida por el gateway + CSRF) es un cambio de arquitectura, no un parche.
+- ~~El JWT del frontend se guarda en `localStorage`~~ — **resuelto**: el JWT ahora viaja en una cookie `httpOnly`/`SameSite=Lax` fijada por `auth-service`; `services/api.js` ya no toca el token (ver tabla de arriba). El logout no revoca el JWT en el servidor (diseño stateless, sin tabla de sesiones) — solo instruye al navegador a borrar la cookie, igual que antes lo hacía `localStorage.removeItem`.
 - No hay autenticación servicio-a-servicio interna (mTLS o JWT de servicio) entre microservicios — la exposición externa ya se cerró, pero dentro de `smartlogix-net` un servicio comprometido podría llamar a otro sin credenciales adicionales.
 - El registro de usuario revela si un email ya existe (`AuthController`) — enumeración de usuarios de severidad baja; corregirlo bien requiere un flujo de verificación por email, fuera de alcance de un fix puntual.
 
@@ -438,6 +451,7 @@ Este proyecto se construye y mantiene con un **equipo de agentes de IA recursivo
 | `FLOW_URL_CONFIRMATION` | ms-pagos | URL pública del webhook (ngrok en desarrollo) |
 | `FLOW_URL_RETURN` | ms-pagos | URL del frontend para retorno post-pago |
 | `FLOW_VERIFY_SIGNATURE` | ms-pagos | `false` en sandbox, `true` en producción |
+| `COOKIE_SECURE` | auth-service | Atributo `Secure` de la cookie `sl_jwt`. **`true` por defecto**; `false` solo en `.env` local (este repo corre sobre HTTP en Docker Compose — un navegador nunca envía una cookie `Secure` sin TLS). Debe ser `true` en cualquier despliegue alcanzable desde internet |
 
 ---
 

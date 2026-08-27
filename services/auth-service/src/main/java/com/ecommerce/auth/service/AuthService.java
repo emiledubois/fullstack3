@@ -1,16 +1,20 @@
 package com.ecommerce.auth.service;
 
 import com.ecommerce.auth.dto.LoginRequest;
+import com.ecommerce.auth.dto.LoginResult;
 import com.ecommerce.auth.dto.RegisterRequest;
+import com.ecommerce.auth.exception.InvalidCredentialsException;
 import com.ecommerce.auth.model.User;
 import com.ecommerce.auth.repository.UserRepository;
 import com.ecommerce.auth.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthService {
 
     private final UserRepository userRepository;
@@ -32,14 +36,30 @@ public class AuthService {
         return "Usuario registrado exitosamente";
     }
 
-    public String login(LoginRequest req) {
+    public LoginResult login(LoginRequest req) {
         User user = userRepository.findByEmail(req.getEmail())
-                .orElseThrow(() -> new RuntimeException("Credenciales inválidas"));
+                .orElseThrow(() -> {
+                    log.info("Login fallido — email: {}", req.getEmail());
+                    return new InvalidCredentialsException("Credenciales inválidas");
+                });
 
         if (!passwordEncoder.matches(req.getPassword(), user.getPassword())) {
-            throw new RuntimeException("Credenciales inválidas");
+            log.info("Login fallido — email: {}", req.getEmail());
+            throw new InvalidCredentialsException("Credenciales inválidas");
         }
 
-        return jwtUtil.generateToken(user.getEmail(), user.getRole());
+        String token = jwtUtil.generateToken(user.getEmail(), user.getRole());
+        log.info("Login exitoso — email: {}", user.getEmail());
+        return new LoginResult(token, user.getEmail(), user.getRole(),
+                jwtUtil.extractExpiration(token), jwtUtil.getExpirationSeconds());
+    }
+
+    // Stateless JWT: this only tells the caller "if you had a valid cookie,
+    // here's who you were" for the audit log — it cannot revoke the token
+    // itself (see design doc §4).
+    public void logout(String token) {
+        if (token != null && jwtUtil.isValid(token)) {
+            log.info("Logout — email: {}", jwtUtil.extractEmail(token));
+        }
     }
 }

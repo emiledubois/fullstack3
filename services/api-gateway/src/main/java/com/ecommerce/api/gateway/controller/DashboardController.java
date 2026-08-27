@@ -7,7 +7,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -47,13 +46,13 @@ public class DashboardController {
     /**
      * GET /api/dashboard
      *
-     * El AuthFilter del gateway ya validó el JWT antes de llegar aquí.
-     * Se propaga el token a los microservicios para que no rechacen la llamada.
+     * El AuthFilter del gateway ya validó el JWT (ahora vía cookie httpOnly)
+     * antes de llegar aquí. ms-inventario/ms-pedidos/ms-envios nunca
+     * implementaron su propia autenticación (no leen Authorization ni
+     * X-User-Email) — no hay nada que propagar en estas llamadas internas.
      */
     @GetMapping
-    public DashboardDTO getDashboard(HttpServletRequest request) {
-        // Extraer el JWT del request entrante para propagarlo
-        String authHeader = request.getHeader("Authorization");
+    public DashboardDTO getDashboard() {
         log.info("[WebHub] GET /api/dashboard — aggregating 3 services in parallel");
 
         // Llamadas paralelas con Mono.zip
@@ -61,7 +60,6 @@ public class DashboardController {
         // El tiempo total es el del servicio más lento, no la suma.
         Mono<List<ProductoResumen>> productosMono = inventarioClient
             .get().uri("/inventario")
-            .header("Authorization", authHeader)
             .retrieve()
             .bodyToFlux(ProductoResumen.class)
             .collectList()
@@ -71,7 +69,6 @@ public class DashboardController {
 
         Mono<List<PedidoResumen>> pedidosMono = pedidosClient
             .get().uri("/pedidos")
-            .header("Authorization", authHeader)
             .retrieve()
             .bodyToFlux(PedidoResumen.class)
             .collectList()
@@ -79,7 +76,6 @@ public class DashboardController {
 
         Mono<List<EnvioResumen>> enviosMono = enviosClient
             .get().uri("/envios")
-            .header("Authorization", authHeader)
             .retrieve()
             .bodyToFlux(EnvioResumen.class)
             .collectList()

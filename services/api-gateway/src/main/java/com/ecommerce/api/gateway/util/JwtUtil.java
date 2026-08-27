@@ -24,6 +24,11 @@ public class JwtUtil {
             .parseSignedClaims(token).getPayload().getSubject();
     }
 
+    public String extractRole(String token) {
+        return Jwts.parser().verifyWith(getKey()).build()
+            .parseSignedClaims(token).getPayload().get("role", String.class);
+    }
+
     private SecretKey getKey() {
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
     }

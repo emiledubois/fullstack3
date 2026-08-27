@@ -20,7 +20,7 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/auth/register", "/auth/login").permitAll()
+                .requestMatchers("/auth/register", "/auth/login", "/auth/logout").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 // Swagger UI y OpenAPI docs — públicos
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html",

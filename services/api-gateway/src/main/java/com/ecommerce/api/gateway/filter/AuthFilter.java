@@ -1,24 +1,27 @@
 package com.ecommerce.api.gateway.filter;
 
 import com.ecommerce.api.gateway.util.JwtUtil;
+import jakarta.servlet.http.Cookie;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.servlet.function.*;
 
 @Component
 public class AuthFilter implements HandlerFilterFunction<ServerResponse, ServerResponse> {
+
+    private static final String COOKIE_NAME = "sl_jwt";
 
     @Autowired private JwtUtil jwtUtil;
 
     @Override
     public ServerResponse filter(ServerRequest req, HandlerFunction<ServerResponse> next)
             throws Exception {
-        String auth = req.headers().firstHeader("Authorization");
-        if (auth == null || !auth.startsWith("Bearer "))
+        String token = extractToken(req);
+        if (token == null)
             return ServerResponse.status(HttpStatus.UNAUTHORIZED).body("Token requerido");
 
-        String token = auth.substring(7);
         if (!jwtUtil.isValid(token))
             return ServerResponse.status(HttpStatus.UNAUTHORIZED).body("Token inválido");
 
@@ -29,5 +32,11 @@ public class AuthFilter implements HandlerFilterFunction<ServerResponse, ServerR
             .headers(headers -> headers.remove("X-User-Email"))
             .header("X-User-Email", jwtUtil.extractEmail(token)).build();
         return next.handle(modified);
+    }
+
+    private String extractToken(ServerRequest req) {
+        MultiValueMap<String, Cookie> cookies = req.cookies();
+        Cookie cookie = cookies.getFirst(COOKIE_NAME);
+        return cookie != null ? cookie.getValue() : null;
     }
 }

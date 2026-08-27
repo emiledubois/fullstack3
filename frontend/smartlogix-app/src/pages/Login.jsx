@@ -26,18 +26,10 @@ export default function Login() {
         setPassword("");
       } else {
         // ── LOGIN ──
-        const res = await authAPI.login({ email, password });
-        // auth-service retorna el JWT como String JSON.
-        // Axios parsea automáticamente → res.data = string sin comillas.
-        // .trim() elimina espacios o saltos de línea accidentales.
-        const token = (typeof res.data === "string" ? res.data : String(res.data)).trim();
-
-        if (!token || !token.startsWith("eyJ")) {
-          throw new Error("Token inválido recibido del servidor.");
-        }
-
-        localStorage.setItem("token", token);
-        window.location.reload(); // recarga para que App.jsx detecte el token
+        // El JWT viaja en una cookie httpOnly (Set-Cookie: sl_jwt) que el
+        // navegador fija solo; el body ya no lo contiene y JS nunca lo toca.
+        await authAPI.login({ email, password });
+        window.location.reload(); // recarga para que App.jsx consulte /api/session
       }
     } catch (err) {
       // El error puede venir del backend (err.response.data) o ser local

@@ -61,6 +61,7 @@ Marcar cada ítem como `✅ implementado`, `⚠️ parcial`, o `❌ pendiente`. 
 | Control de acceso por propietario, no solo autenticación (anti-IDOR) | N/A — modelo de dominio es single-tenant por PYME (pool de staff compartido, sin `tenant_id`/segregación por cliente), confirmado en auditoría que no aplica IDOR clásico hoy; revisar si el modelo evoluciona a multi-tenant | controllers de `ms-pedidos`, `ms-envios`, `ms-pagos` |
 | Autenticación servicio-a-servicio interna (mTLS o JWT de servicio) | ❌ pendiente — dentro de `smartlogix-net` un servicio comprometido podría llamar a otro sin credenciales adicionales (p. ej. `POST /pedidos/{id}/confirmar-pago`); el cierre de puertos externos reduce pero no elimina este gap | comunicación inter-servicio |
 | No exponer información de usuario en errores (anti user-enumeration) | ⚠️ pendiente — `AuthController.register()` revela si un email ya existe; severidad baja, requiere flujo de verificación por email para resolver bien | `auth-service` |
+| JWT no accesible por JavaScript (anti-XSS token exfiltration) | ✅ **corregido 2026-08-26** — antes el JWT vivía en `localStorage`, legible por cualquier script inyectado; migrado a cookie `httpOnly`/`Secure` (condicional a `COOKIE_SECURE`)/`SameSite=Lax`, ver `docs/designs/jwt-httponly-cookie-migration.md` | `auth-service`, `api-gateway`, `frontend` |
 
 ### 4.2 Derechos ARCO+ (Ley 21.719, art. sobre derechos de los titulares)
 | Derecho | Estado | Nota |

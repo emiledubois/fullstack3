@@ -7,32 +7,25 @@ const api = axios.create({
   baseURL: API_BASE,
   headers: { "Content-Type": "application/json" },
   timeout: 10000,
+  // El JWT ahora vive en una cookie httpOnly (sl_jwt) fijada por auth-service
+  // — el navegador la adjunta solo si withCredentials está activo. JS nunca
+  // la lee ni la fija manualmente.
+  withCredentials: true,
 });
-
-// ── Interceptor de REQUEST: agrega el token JWT a todas las peticiones ──
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
 
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     const url = error.config?.url || "";
+    // /auth/* y /session manejan su propio 401 esperado (login fallido,
+    // "todavía no hay sesión" respectivamente) — no forzar redirección ahí.
     const isAuthEndpoint = url.includes("/auth/login") || url.includes("/auth/register");
+    const isSessionEndpoint = url.includes("/session");
 
-    if (error.response?.status === 401 && !isAuthEndpoint) {
-      // Solo redirigir al login si NO estamos en un endpoint de autenticación
-      localStorage.removeItem("token");
+    if (error.response?.status === 401 && !isAuthEndpoint && !isSessionEndpoint) {
+      // Cookie ausente/expirada en cualquier otra llamada — forzar re-login
       window.location.href = "/";
     }
-    // Para /auth/* dejar que el catch del componente maneje el error
     return Promise.reject(error);
   }
 );
@@ -42,6 +35,11 @@ api.interceptors.response.use(
 export const authAPI = {
   register: (data) => api.post("/auth/register", data),
   login:    (data) => api.post("/auth/login", data),
+  logout:   ()     => api.post("/auth/logout"),
+};
+
+export const sessionAPI = {
+  get: () => api.get("/session"),
 };
 
 export const inventarioAPI = {

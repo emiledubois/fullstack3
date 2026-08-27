@@ -1,6 +1,7 @@
 package com.ecommerce.api.gateway.config;
 
 import com.ecommerce.api.gateway.filter.AuthFilter;
+import com.ecommerce.api.gateway.filter.StripCookieFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.server.mvc.handler.*;
 import org.springframework.context.annotation.*;
@@ -15,6 +16,9 @@ public class GatewayConfig {
 
     @Autowired
     private AuthFilter authFilter;
+
+    @Autowired
+    private StripCookieFilter stripCookieFilter;
 
     // PUBLIC — no JWT required
     // /api/auth/login  →  auth-service:8081/auth/login  (stripPrefix(1) removes /api)
@@ -34,6 +38,7 @@ public class GatewayConfig {
                 .route(path("/api/inventario/**"), HandlerFunctions.http("http://ms-inventario:8082"))
                 .filter(stripPrefix(1))
                 .filter(authFilter)
+                .filter(stripCookieFilter)
                 .build();
     }
 
@@ -44,6 +49,7 @@ public class GatewayConfig {
                 .route(path("/api/pedidos/**"), HandlerFunctions.http("http://ms-pedidos:8083"))
                 .filter(stripPrefix(1))
                 .filter(authFilter)
+                .filter(stripCookieFilter)
                 .build();
     }
 
@@ -54,6 +60,7 @@ public class GatewayConfig {
                 .route(path("/api/envios/**"), HandlerFunctions.http("http://ms-envios:8084"))
                 .filter(stripPrefix(1))
                 .filter(authFilter)
+                .filter(stripCookieFilter)
                 .build();
     }
 
@@ -64,6 +71,7 @@ public class GatewayConfig {
                 .route(path("/api/sagas/**"), HandlerFunctions.http("http://ms-pedidos:8083"))
                 .filter(stripPrefix(1))
                 .filter(authFilter)
+                .filter(stripCookieFilter)
                 .build();
     }
 
@@ -80,6 +88,22 @@ public class GatewayConfig {
                 .route(path("/api/dashboard/**"), HandlerFunctions.http("http://localhost:8080"))
                 .filter(stripPrefix(1))
                 .filter(authFilter)
+                .filter(stripCookieFilter)
+                .build();
+    }
+
+    /**
+     * GET /api/session — como /api/dashboard, atendido directamente por
+     * SessionController en el gateway (WebHub/BFF), sin llamada a auth-service.
+     * A diferencia de las rutas de arriba, aquí NO se aplica stripCookieFilter:
+     * SessionController necesita leer la cookie sl_jwt para extraer email/role.
+     */
+    @Bean
+    public RouterFunction<ServerResponse> sessionRoute() {
+        return GatewayRouterFunctions.route("session")
+                .route(path("/api/session/**"), HandlerFunctions.http("http://localhost:8080"))
+                .filter(stripPrefix(1))
+                .filter(authFilter)
                 .build();
     }
 
@@ -90,6 +114,7 @@ public class GatewayConfig {
                 .route(path("/api/pagos/**"), HandlerFunctions.http("http://ms-pagos:8086"))
                 .filter(stripPrefix(1))
                 .filter(authFilter)  // JWT requerido para /api/pagos/crear y /api/pagos/{id}
+                .filter(stripCookieFilter)
                 .build();
     }
 

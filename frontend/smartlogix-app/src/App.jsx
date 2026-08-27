@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Dashboard     from "./pages/Dashboard";
 import Inventario    from "./pages/Inventario";
 import Pedidos       from "./pages/Pedidos";
 import Envios        from "./pages/Envios";
 import Login         from "./pages/Login";
 import PagoResultado from "./pages/PagoResultado";
+import { authAPI, sessionAPI } from "./services/api";
 
 const NAV = [
   { key:"dashboard",  label:"Dashboard",  icon:"" },
@@ -15,16 +16,47 @@ const NAV = [
 
 export default function App() {
   const [page, setPage] = useState("dashboard");
-  const token = localStorage.getItem("token");
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [authenticated, setAuthenticated] = useState(false);
+
+  const esPagoResultado = window.location.pathname === "/pago-resultado";
+
+  useEffect(() => {
+    // El JWT vive en una cookie httpOnly — ya no es legible desde JS
+    // (localStorage.getItem("token")), así que le preguntamos al servidor.
+    if (esPagoResultado) {
+      setCheckingSession(false);
+      return;
+    }
+    sessionAPI.get()
+      .then(() => setAuthenticated(true))
+      .catch(() => setAuthenticated(false))
+      .finally(() => setCheckingSession(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Interceptar redirección de Flow ANTES de cualquier otra lógica
-  if (window.location.pathname === "/pago-resultado") {
+  if (esPagoResultado) {
     return <PagoResultado />;
   }
 
-  if (!token) return <Login />;
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 text-gray-500 text-sm">
+        Cargando...
+      </div>
+    );
+  }
 
-  const logout = () => { localStorage.removeItem("token"); window.location.reload(); };
+  if (!authenticated) return <Login />;
+
+  const logout = async () => {
+    try {
+      await authAPI.logout();
+    } finally {
+      window.location.reload();
+    }
+  };
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
