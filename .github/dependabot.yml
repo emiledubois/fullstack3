@@ -95,6 +95,8 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "eslint-plugin-*"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "@eslint/js"
+        update-types: ["version-update:semver-major"]
 
   # Docker base images — this project is deliberately pinned to the Java 17
   # LTS line (every pom.xml sets <java.version>17</java.version>, matched by
