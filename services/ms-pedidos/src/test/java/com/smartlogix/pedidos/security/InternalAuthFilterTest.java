@@ -210,6 +210,68 @@ class InternalAuthFilterTest {
     }
 
     @Test
+    void doFilter_sinCabecerasInternasSobreEndpointInternoPorEmail_retorna401() throws Exception {
+
+        // ARRANGE — regresión IDOR: sin credencial interna, ni siquiera
+        // debería intentarse (criterio de aceptación 5e del diseño ARCO+)
+        MockHttpServletRequest request = new MockHttpServletRequest(
+            "GET", "/pedidos/interno/por-email/victima@pyme.cl");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        // ACT
+        filter.doFilter(request, response, chain);
+
+        // ASSERT
+        assertEquals(401, response.getStatus());
+        assertTrue(response.getContentAsString().contains("Autenticación interna requerida"));
+        assertNull(chain.getRequest());
+    }
+
+    @Test
+    void doFilter_firmaValidaDeApiGatewaySobreEndpointInternoPorEmail_continuaLaCadena() throws Exception {
+
+        // ARRANGE — cae en el bucket por defecto ("todo lo demás → api-gateway")
+        long timestamp = System.currentTimeMillis();
+        MockHttpServletRequest request = new MockHttpServletRequest(
+            "GET", "/pedidos/interno/por-email/dueña@pyme.cl");
+        request.addHeader("X-Internal-Service", "api-gateway");
+        request.addHeader("X-Internal-Timestamp", String.valueOf(timestamp));
+        request.addHeader("X-Internal-Signature", sign("api-gateway", timestamp));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        // ACT
+        filter.doFilter(request, response, chain);
+
+        // ASSERT
+        assertEquals(200, response.getStatus());
+        assertNotNull(chain.getRequest());
+    }
+
+    @Test
+    void doFilter_firmaValidaDeMsPagosSobreEndpointInternoPorEmail_retorna403() throws Exception {
+
+        // ARRANGE — ms-pagos NO está en el allowlist de este endpoint
+        // (solo confirmar-pago/pago-fallido lo permiten)
+        long timestamp = System.currentTimeMillis();
+        MockHttpServletRequest request = new MockHttpServletRequest(
+            "GET", "/pedidos/interno/por-email/dueña@pyme.cl");
+        request.addHeader("X-Internal-Service", "ms-pagos");
+        request.addHeader("X-Internal-Timestamp", String.valueOf(timestamp));
+        request.addHeader("X-Internal-Signature", sign("ms-pagos", timestamp));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        // ACT
+        filter.doFilter(request, response, chain);
+
+        // ASSERT
+        assertEquals(403, response.getStatus());
+        assertNull(chain.getRequest());
+    }
+
+    @Test
     void validarConfiguracion_secretoVacio_lanzaIllegalStateException() {
 
         // ARRANGE

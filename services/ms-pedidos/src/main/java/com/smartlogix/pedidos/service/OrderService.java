@@ -3,6 +3,7 @@ package com.smartlogix.pedidos.service;
 import com.smartlogix.pedidos.client.InventarioClient;
 import com.smartlogix.pedidos.dto.CreatePedidoRequest;
 import com.smartlogix.pedidos.dto.OrderDTO;
+import com.smartlogix.pedidos.dto.PedidoDatosDTO;
 import com.smartlogix.pedidos.event.PedidoAprobadoEvent;
 import com.smartlogix.pedidos.factory.PedidoFactory;
 import com.smartlogix.pedidos.model.Pedido;
@@ -61,6 +62,16 @@ public class OrderService {
         return orderRepository.findById(id)
                 .map(OrderDTO::from)
                 .orElseThrow(() -> new RuntimeException("Pedido no encontrado: " + id));
+    }
+
+    /**
+     * Llamado internamente por api-gateway (GET /pedidos/interno/por-email/{email})
+     * para el endpoint de derecho de acceso ARCO+. Lista vacía si el email
+     * no tiene pedidos — no es un error.
+     */
+    public List<PedidoDatosDTO> getPedidosByUserEmail(String email) {
+        return orderRepository.findByUserEmail(email)
+                .stream().map(PedidoDatosDTO::from).collect(Collectors.toList());
     }
 
     /**

@@ -68,6 +68,7 @@ services:
     environment:
       JWT_SECRET: ${JWT_SECRET}
       INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET}
+      AUTH_URL:       http://auth-service:8081
       INVENTARIO_URL: http://ms-inventario:8082
       PEDIDOS_URL:    http://ms-pedidos:8083
       ENVIOS_URL:     http://ms-envios:8084
@@ -75,16 +76,23 @@ services:
     networks:
       - smartlogix-net
 
+  # NOTE: auth-service intentionally has NO "ports:" mapping to the host
+  # either (see the note above ms-inventario/ms-pedidos/ms-envios/ms-pagos/
+  # notification-service). It now exposes GET /auth/interno/usuarios/{email}
+  # (derecho de acceso ARCO+, arco-acceso-personal-data.md), guarded by its
+  # own InternalAuthFilter — but that filter is only a hard requirement
+  # *because* this port is closed; leaving 8081 published to the host would
+  # let anyone curl that endpoint directly, with zero JWT and zero internal
+  # auth check, bypassing both api-gateway and the filter (OWASP A01:2021).
   auth-service:
     build: ./services/auth-service
-    ports:
-      - "8081:8081"
     environment:
       DB_HOST: postgres-auth
       DB_NAME: auth_db
       DB_USER: postgres
       DB_PASS: ${DB_PASS}
       JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
     depends_on:
       - postgres-auth

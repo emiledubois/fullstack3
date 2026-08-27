@@ -26,10 +26,19 @@ public class GatewayConfig {
 
     // PUBLIC — no JWT required
     // /api/auth/login  →  auth-service:8081/auth/login  (stripPrefix(1) removes /api)
+    //
+    // /api/auth/interno/** se EXCLUYE deliberadamente: ese sub-path solo
+    // existe para que UsuarioDatosController (BFF, este mismo gateway) lo
+    // llame directamente al hostname del contenedor. Si quedara enrutable
+    // aquí, cualquier cliente podría pedir el email de OTRO usuario editando
+    // la URL — InternalTokenIssuerFilter firmaría la petición como
+    // api-gateway igual, y el nuevo InternalAuthFilter de auth-service la
+    // dejaría pasar (ver arco-acceso-personal-data.md §6 A01).
     @Bean
     public RouterFunction<ServerResponse> authRoute() {
         return GatewayRouterFunctions.route("auth")
-                .route(path("/api/auth/**"), HandlerFunctions.http("http://auth-service:8081"))
+                .route(path("/api/auth/**").and(path("/api/auth/interno/**").negate()),
+                        HandlerFunctions.http("http://auth-service:8081"))
                 .filter(stripPrefix(1))
                 .build();
     }
@@ -48,10 +57,16 @@ public class GatewayConfig {
     }
 
     // /api/pedidos/**  →  ms-pedidos:8083/pedidos/**
+    //
+    // /api/pedidos/interno/** se EXCLUYE deliberadamente — mismo motivo que
+    // authRoute(): sin esta exclusión, cualquier usuario autenticado podría
+    // leer el historial de pedidos de OTRO usuario editando el email en la
+    // URL (ver arco-acceso-personal-data.md §6 A01).
     @Bean
     public RouterFunction<ServerResponse> pedidosRoute() {
         return GatewayRouterFunctions.route("pedidos")
-                .route(path("/api/pedidos/**"), HandlerFunctions.http("http://ms-pedidos:8083"))
+                .route(path("/api/pedidos/**").and(path("/api/pedidos/interno/**").negate()),
+                        HandlerFunctions.http("http://ms-pedidos:8083"))
                 .filter(stripPrefix(1))
                 .filter(authFilter)
                 .filter(internalTokenIssuerFilter)
@@ -60,10 +75,14 @@ public class GatewayConfig {
     }
 
     // /api/envios/**  →  ms-envios:8084/envios/**
+    //
+    // /api/envios/interno/** se EXCLUYE deliberadamente — mismo motivo que
+    // pedidosRoute() (ver arco-acceso-personal-data.md §6 A01).
     @Bean
     public RouterFunction<ServerResponse> enviosRoute() {
         return GatewayRouterFunctions.route("envios")
-                .route(path("/api/envios/**"), HandlerFunctions.http("http://ms-envios:8084"))
+                .route(path("/api/envios/**").and(path("/api/envios/interno/**").negate()),
+                        HandlerFunctions.http("http://ms-envios:8084"))
                 .filter(stripPrefix(1))
                 .filter(authFilter)
                 .filter(internalTokenIssuerFilter)
@@ -110,6 +129,22 @@ public class GatewayConfig {
     public RouterFunction<ServerResponse> sessionRoute() {
         return GatewayRouterFunctions.route("session")
                 .route(path("/api/session/**"), HandlerFunctions.http("http://localhost:8080"))
+                .filter(stripPrefix(1))
+                .filter(authFilter)
+                .build();
+    }
+
+    /**
+     * GET /api/usuarios/me/datos — como /api/session, atendido directamente
+     * por UsuarioDatosController en el gateway (WebHub/BFF). Igual que
+     * sessionRoute, NO se aplica stripCookieFilter: el controller necesita
+     * leer la cookie sl_jwt para derivar la identidad del llamador — nunca
+     * de un parámetro de la petición (arco-acceso-personal-data.md §3.1).
+     */
+    @Bean
+    public RouterFunction<ServerResponse> usuariosRoute() {
+        return GatewayRouterFunctions.route("usuarios")
+                .route(path("/api/usuarios/**"), HandlerFunctions.http("http://localhost:8080"))
                 .filter(stripPrefix(1))
                 .filter(authFilter)
                 .build();

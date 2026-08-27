@@ -2,6 +2,7 @@ package com.ecommerce.auth.service;
 
 import com.ecommerce.auth.dto.LoginRequest;
 import com.ecommerce.auth.dto.LoginResult;
+import com.ecommerce.auth.dto.UsuarioInternoDTO;
 import com.ecommerce.auth.exception.InvalidCredentialsException;
 import com.ecommerce.auth.model.User;
 import com.ecommerce.auth.repository.UserRepository;
@@ -14,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -129,5 +131,38 @@ class AuthServiceTest {
         // ACT & ASSERT
         assertDoesNotThrow(() -> authService.logout(null));
         verify(jwtUtil, never()).extractEmail(any());
+    }
+
+    @Test
+    void buscarUsuarioInterno_emailExiste_retornaDTOSinPassword() {
+
+        // ARRANGE
+        User user = User.builder()
+                .email("dueña@pyme.cl").password("hash-secreto")
+                .role("ROLE_USER").createdAt(LocalDateTime.of(2026, 1, 15, 9, 0))
+                .build();
+        when(userRepository.findByEmail("dueña@pyme.cl")).thenReturn(Optional.of(user));
+
+        // ACT
+        Optional<UsuarioInternoDTO> resultado = authService.buscarUsuarioInterno("dueña@pyme.cl");
+
+        // ASSERT
+        assertTrue(resultado.isPresent());
+        assertEquals("dueña@pyme.cl", resultado.get().getEmail());
+        assertEquals("ROLE_USER", resultado.get().getRole());
+        assertEquals(LocalDateTime.of(2026, 1, 15, 9, 0), resultado.get().getCuentaCreadaEn());
+    }
+
+    @Test
+    void buscarUsuarioInterno_emailNoExiste_retornaOptionalVacio() {
+
+        // ARRANGE
+        when(userRepository.findByEmail("nadie@pyme.cl")).thenReturn(Optional.empty());
+
+        // ACT
+        Optional<UsuarioInternoDTO> resultado = authService.buscarUsuarioInterno("nadie@pyme.cl");
+
+        // ASSERT
+        assertTrue(resultado.isEmpty());
     }
 }

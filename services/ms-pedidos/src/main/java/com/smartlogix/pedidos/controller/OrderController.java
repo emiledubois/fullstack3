@@ -2,6 +2,7 @@ package com.smartlogix.pedidos.controller;
 
 import com.smartlogix.pedidos.dto.CreatePedidoRequest;
 import com.smartlogix.pedidos.dto.OrderDTO;
+import com.smartlogix.pedidos.dto.PedidoDatosDTO;
 import com.smartlogix.pedidos.facade.LogisticaFacade;
 import com.smartlogix.pedidos.service.OrderService;
 import jakarta.validation.Valid;
@@ -48,6 +49,17 @@ public class OrderController {
     @GetMapping("/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("ms-pedidos UP (Facade activo)");
+    }
+
+    /**
+     * No enrutable vía /api/pedidos/** (excluido en GatewayConfig.pedidosRoute(),
+     * ver arco-acceso-personal-data.md §3.3/§5). Solo alcanzable por
+     * api-gateway — InternalAuthFilter ya lo permite en su bucket por
+     * defecto ("todo lo demás → solo api-gateway"), sin cambios de código.
+     */
+    @GetMapping("/interno/por-email/{email}")
+    public ResponseEntity<List<PedidoDatosDTO>> getPedidosPorEmail(@PathVariable String email) {
+        return ResponseEntity.ok(orderService.getPedidosByUserEmail(email));
     }
 
     /**

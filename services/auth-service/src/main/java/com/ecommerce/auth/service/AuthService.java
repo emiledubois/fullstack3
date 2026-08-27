@@ -3,6 +3,7 @@ package com.ecommerce.auth.service;
 import com.ecommerce.auth.dto.LoginRequest;
 import com.ecommerce.auth.dto.LoginResult;
 import com.ecommerce.auth.dto.RegisterRequest;
+import com.ecommerce.auth.dto.UsuarioInternoDTO;
 import com.ecommerce.auth.exception.InvalidCredentialsException;
 import com.ecommerce.auth.model.User;
 import com.ecommerce.auth.repository.UserRepository;
@@ -11,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -52,6 +55,16 @@ public class AuthService {
         log.info("Login exitoso — email: {}", user.getEmail());
         return new LoginResult(token, user.getEmail(), user.getRole(),
                 jwtUtil.extractExpiration(token), jwtUtil.getExpirationSeconds());
+    }
+
+    /**
+     * Llamado internamente por api-gateway (GET /auth/interno/usuarios/{email})
+     * para el endpoint de derecho de acceso ARCO+. Nunca devuelve la entidad
+     * User (tiene password) — solo el DTO dedicado, sin campo password.
+     */
+    public Optional<UsuarioInternoDTO> buscarUsuarioInterno(String email) {
+        return userRepository.findByEmail(email)
+                .map(u -> new UsuarioInternoDTO(u.getEmail(), u.getRole(), u.getCreatedAt()));
     }
 
     // Stateless JWT: this only tells the caller "if you had a valid cookie,

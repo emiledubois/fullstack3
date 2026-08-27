@@ -3,6 +3,7 @@ package com.smartlogix.pedidos.service;
 import com.smartlogix.pedidos.client.InventarioClient;
 import com.smartlogix.pedidos.dto.CreatePedidoRequest;
 import com.smartlogix.pedidos.dto.OrderDTO;
+import com.smartlogix.pedidos.dto.PedidoDatosDTO;
 import com.smartlogix.pedidos.event.PedidoAprobadoEvent;
 import com.smartlogix.pedidos.factory.PedidoFactory;
 import com.smartlogix.pedidos.model.Pedido;
@@ -15,6 +16,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -150,5 +153,37 @@ class OrderServiceTest {
     }
 
 
+    @Test
+    void getPedidosByUserEmail_emailConPedidos_retornaListaMapeadaSinUserIdNiUserEmail() {
+
+        // ARRANGE
+        Pedido pedido = Pedido.builder()
+                .id(42L).userId(1L).userEmail("dueña@pyme.cl")
+                .clienteNombre("Comercial Andina Ltda.").total(15990.0)
+                .status("ENTREGADO").tipoPedido("NACIONAL").destino("Valparaíso")
+                .productoId(7L).cantidad(3).build();
+        when(orderRepository.findByUserEmail("dueña@pyme.cl")).thenReturn(List.of(pedido));
+
+        // ACT
+        List<PedidoDatosDTO> resultado = orderService.getPedidosByUserEmail("dueña@pyme.cl");
+
+        // ASSERT
+        assertEquals(1, resultado.size());
+        assertEquals(42L, resultado.get(0).getId());
+        assertEquals("Valparaíso", resultado.get(0).getDestino());
+    }
+
+    @Test
+    void getPedidosByUserEmail_emailSinPedidos_retornaListaVacia() {
+
+        // ARRANGE
+        when(orderRepository.findByUserEmail("nadie@pyme.cl")).thenReturn(List.of());
+
+        // ACT
+        List<PedidoDatosDTO> resultado = orderService.getPedidosByUserEmail("nadie@pyme.cl");
+
+        // ASSERT
+        assertTrue(resultado.isEmpty());
+    }
 
 }

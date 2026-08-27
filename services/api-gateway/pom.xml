@@ -74,6 +74,15 @@
 		    <groupId>org.springframework.boot</groupId>
 		    <artifactId>spring-boot-starter-webflux</artifactId>
 		</dependency>
+		<!-- Test-only: servidor HTTP local para probar el aggregation logic
+		     de UsuarioDatosController (WebClient real hablando con un
+		     backend falso) sin mockear la API fluida de WebClient. -->
+		<dependency>
+		    <groupId>com.squareup.okhttp3</groupId>
+		    <artifactId>mockwebserver</artifactId>
+		    <version>4.12.0</version>
+		    <scope>test</scope>
+		</dependency>
 	</dependencies>
 	<dependencyManagement>
 		<dependencies>

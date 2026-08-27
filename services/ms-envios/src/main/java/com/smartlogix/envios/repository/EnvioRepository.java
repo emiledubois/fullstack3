@@ -6,4 +6,5 @@ import java.util.List;
 public interface EnvioRepository extends JpaRepository<Envio, Long> {
     List<Envio> findByPedidoId(Long pedidoId);
     List<Envio> findByStatus(String status);
+    List<Envio> findByPedidoIdIn(List<Long> pedidoIds);
 }

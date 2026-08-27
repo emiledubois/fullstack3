@@ -45,4 +45,25 @@ class EnvioServiceTest {
             .isInstanceOf(RuntimeException.class)
             .hasMessageContaining("Envío no encontrado");
     }
+
+    @Test @DisplayName("getPorPedidoIds con pedidoIds existentes retorna los envíos mapeados")
+    void getPorPedidoIds_conPedidoIdsExistentes_retornaListaMapeada() {
+        Envio envio = Envio.builder().id(17L).pedidoId(42L).status("ENTREGADO")
+            .tipoEnvio("TERRESTRE").transportista("Transportes del Sur").destino("Valparaíso").build();
+        when(envioRepository.findByPedidoIdIn(List.of(42L))).thenReturn(List.of(envio));
+
+        List<com.smartlogix.envios.dto.EnvioDatosDTO> resultado = envioService.getPorPedidoIds(List.of(42L));
+
+        assertThat(resultado).hasSize(1);
+        assertThat(resultado.get(0).getId()).isEqualTo(17L);
+        assertThat(resultado.get(0).getPedidoId()).isEqualTo(42L);
+    }
+
+    @Test @DisplayName("getPorPedidoIds con lista vacía retorna vacío sin consultar el repositorio")
+    void getPorPedidoIds_listaVacia_retornaVacioSinConsultarRepositorio() {
+        List<com.smartlogix.envios.dto.EnvioDatosDTO> resultado = envioService.getPorPedidoIds(List.of());
+
+        assertThat(resultado).isEmpty();
+        verify(envioRepository, never()).findByPedidoIdIn(any());
+    }
 }

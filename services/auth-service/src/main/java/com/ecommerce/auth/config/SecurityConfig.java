@@ -21,6 +21,12 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/auth/register", "/auth/login", "/auth/logout").permitAll()
+                // /auth/interno/** no es público: InternalAuthFilter (Order
+                // HIGHEST_PRECEDENCE) ya exigió y verificó la firma HMAC de
+                // api-gateway antes de que la petición llegue aquí — este
+                // permitAll solo evita que Spring Security la vuelva a
+                // bloquear por falta de un Authentication de usuario final.
+                .requestMatchers("/auth/interno/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 // Swagger UI y OpenAPI docs — públicos
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html",

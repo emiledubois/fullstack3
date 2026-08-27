@@ -37,4 +37,15 @@ public class EnvioService {
         envio.setStatus(nuevoStatus);
         return EnvioDTO.from(envioRepository.save(envio));
     }
+
+    /**
+     * Llamado internamente por api-gateway (GET /envios/interno/por-pedidos)
+     * para el endpoint de derecho de acceso ARCO+. Lista vacía si ningún
+     * pedidoId tiene envíos asociados — no es un error.
+     */
+    public List<EnvioDatosDTO> getPorPedidoIds(List<Long> pedidoIds) {
+        if (pedidoIds.isEmpty()) return List.of();
+        return envioRepository.findByPedidoIdIn(pedidoIds).stream()
+            .map(EnvioDatosDTO::from).collect(Collectors.toList());
+    }
 }

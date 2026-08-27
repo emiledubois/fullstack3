@@ -146,6 +146,68 @@ class InternalAuthFilterTest {
     }
 
     @Test
+    void doFilter_sinCabecerasInternasSobreEndpointInternoPorPedidos_retorna401() throws Exception {
+
+        // ARRANGE — regresión IDOR: sin credencial interna, nunca debería
+        // llegar a leer envíos ajenos (criterio de aceptación 5e del diseño ARCO+)
+        MockHttpServletRequest request = new MockHttpServletRequest(
+            "GET", "/envios/interno/por-pedidos");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        // ACT
+        filter.doFilter(request, response, chain);
+
+        // ASSERT
+        assertEquals(401, response.getStatus());
+        assertTrue(response.getContentAsString().contains("Autenticación interna requerida"));
+        assertNull(chain.getRequest());
+    }
+
+    @Test
+    void doFilter_firmaValidaDeApiGatewaySobreEndpointInternoPorPedidos_continuaLaCadena() throws Exception {
+
+        // ARRANGE — cae en el bucket por defecto ("todo lo demás → api-gateway")
+        long timestamp = System.currentTimeMillis();
+        MockHttpServletRequest request = new MockHttpServletRequest(
+            "GET", "/envios/interno/por-pedidos");
+        request.addHeader("X-Internal-Service", "api-gateway");
+        request.addHeader("X-Internal-Timestamp", String.valueOf(timestamp));
+        request.addHeader("X-Internal-Signature", sign("api-gateway", timestamp));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        // ACT
+        filter.doFilter(request, response, chain);
+
+        // ASSERT
+        assertEquals(200, response.getStatus());
+        assertNotNull(chain.getRequest());
+    }
+
+    @Test
+    void doFilter_firmaValidaDeMsPedidosSobreEndpointInternoPorPedidos_retorna403() throws Exception {
+
+        // ARRANGE — ms-pedidos solo está autorizado en /envios/{id}/cancelar
+        // y en POST /envios, no en el nuevo endpoint interno de lectura
+        long timestamp = System.currentTimeMillis();
+        MockHttpServletRequest request = new MockHttpServletRequest(
+            "GET", "/envios/interno/por-pedidos");
+        request.addHeader("X-Internal-Service", "ms-pedidos");
+        request.addHeader("X-Internal-Timestamp", String.valueOf(timestamp));
+        request.addHeader("X-Internal-Signature", sign("ms-pedidos", timestamp));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        // ACT
+        filter.doFilter(request, response, chain);
+
+        // ASSERT
+        assertEquals(403, response.getStatus());
+        assertNull(chain.getRequest());
+    }
+
+    @Test
     void validarConfiguracion_secretoVacio_lanzaIllegalStateException() {
 
         // ARRANGE

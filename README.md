@@ -256,6 +256,21 @@ GET /api/dashboard   → datos agregados de inventario + pedidos + envíos en un
                         tolerante a fallos parciales: estadoServicios = OK | PARCIAL | ERROR
 ```
 
+### Derecho de acceso ARCO+ (Ley 21.719)
+```
+GET /api/usuarios/me/datos   → datos personales del usuario autenticado: cuenta (auth-service)
+                                + historial de pedidos (ms-pedidos) + envíos asociados (ms-envios)
+                                identidad SIEMPRE derivada de la cookie sl_jwt, nunca de un parámetro
+                                estadoAgregacion = OK | PARCIAL | ERROR (igual convención que /api/dashboard)
+                                NOTA: no incluye datos de ms-pagos en esta iteración (fast-follow pendiente)
+```
+`GET /auth/interno/usuarios/{email}`, `GET /pedidos/interno/por-email/{email}` y
+`GET /envios/interno/por-pedidos?pedidoIds=...` **no son rutas de `/api/**`** —
+`GatewayConfig` las excluye explícitamente del enrutamiento público (devuelven
+`404` del gateway sin importar el JWT) precisamente para que nadie pueda pedir
+los datos de otro usuario editando el email en la URL. Solo el propio
+`UsuarioDatosController` del gateway las llama, container-a-container.
+
 ### Pagos — Flow Chile
 ```
 POST /api/pagos/crear        → iniciar orden de pago en Flow, devuelve urlPago
@@ -266,22 +281,20 @@ GET  /api/pagos/por-token/{token} → consultar estado de un pago por flowToken
 
 ### Health checks
 
-Solo `api-gateway` (8080) y `auth-service` (8081) publican su puerto al host. El resto de los microservicios **no** implementan su propia autenticación — confían en que el gateway ya validó el JWT — por lo que sus puertos se dejaron de publicar para que no puedan ser alcanzados saltándose el gateway (ver [Seguridad implementada](#seguridad-implementada)). Para revisarlos, entra por la red interna de Docker:
+Solo `api-gateway` (8080) publica su puerto al host. `auth-service` (8081) **ya no** lo publica: desde que expone `GET /auth/interno/usuarios/{email}` (derecho de acceso ARCO+), dejarlo alcanzable directamente permitiría saltarse tanto el gateway como su propio `InternalAuthFilter`. El resto de los microservicios tampoco implementan su propia autenticación de usuario final — confían en que el gateway ya validó el JWT — por lo que ninguno publica su puerto al host (ver [Seguridad implementada](#seguridad-implementada)). Para revisarlos, entra por la red interna de Docker:
 
 ```
-GET http://localhost:8080/actuator/health   # gateway
-GET http://localhost:8081/actuator/health   # auth-service
+GET http://localhost:8080/actuator/health   # gateway (único expuesto al host)
 ```
 
 ## Health Check con curl completo
 
 ```bash
-# Expuestos al host
+# Expuesto al host
 curl http://localhost:8080/actuator/health   # api-gateway
-curl http://localhost:8081/actuator/health   # auth-service
 
 # Internos — solo alcanzables dentro de la red Docker (smartlogix-net)
-for svc_port in "ms-inventario:8082" "ms-pedidos:8083" "ms-envios:8084" "notification-service:8085" "ms-pagos:8086"; do
+for svc_port in "auth-service:8081" "ms-inventario:8082" "ms-pedidos:8083" "ms-envios:8084" "notification-service:8085" "ms-pagos:8086"; do
   svc=${svc_port%%:*}; port=${svc_port##*:}
   echo -n "$svc: "
   docker compose exec "$svc" curl -s "localhost:$port/actuator/health"
@@ -409,6 +422,8 @@ end
 | CORS restringido | Headers permitidos explícitos, sin wildcard `*` |
 | Idempotencia en webhook | Pagos ya procesados se ignoran silenciosamente (evita doble cobro) |
 | Microservicios internos sin puerto publicado | `ms-inventario`, `ms-pedidos`, `ms-envios`, `ms-pagos` y `notification-service` no implementan autenticación propia (confían en el `AuthFilter` del gateway) — sus puertos ya no se publican al host, solo son alcanzables por la red interna `smartlogix-net`. Antes de esto podían llamarse directamente saltándose el JWT (OWASP A01) |
+| `auth-service` sin puerto publicado | Igual que la fila anterior: desde que expone `GET /auth/interno/usuarios/{email}` (derecho de acceso ARCO+) protegido por su propio `InternalAuthFilter`, dejar `8081:8081` publicado al host permitiría llamarlo directamente sin JWT ni firma HMAC interna (OWASP A01) — solo alcanzable ahora vía `smartlogix-net` |
+| `/api/{auth,pedidos,envios}/interno/**` excluidos del enrutamiento público | `GatewayConfig` excluye estos sub-paths de `authRoute()`/`pedidosRoute()`/`enviosRoute()` (`path(...).negate()`) — devuelven `404` del gateway sin importar el JWT. Solo `UsuarioDatosController` (mismo proceso del gateway) los llama, siempre con el email derivado de la cookie verificada, nunca de un parámetro de la petición (OWASP A01 — evita IDOR en `GET /api/usuarios/me/datos`) |
 | Anti-spoofing de identidad en el gateway | `AuthFilter` elimina cualquier header `X-User-Email` enviado por el cliente antes de fijar el valor extraído del JWT verificado |
 | JWT en cookie `httpOnly` (no `localStorage`) | `auth-service` fija el JWT vía `Set-Cookie: sl_jwt=...; HttpOnly; Secure; SameSite=Lax` — JS nunca lo lee ni lo puede exfiltrar ante un XSS futuro. `AuthFilter` lo valida desde la cookie y la elimina antes de reenviar a `ms-inventario`/`ms-pedidos`/`ms-envios`/`ms-pagos` (mismo patrón de minimización que `X-User-Email`) |
 | Validación de entrada (Bean Validation) | `@Valid` + `@NotBlank`/`@NotNull`/`@Positive`/`@Email`/`@Size` en los DTOs de request de todos los servicios (antes solo `ms-inventario` la tenía) |
