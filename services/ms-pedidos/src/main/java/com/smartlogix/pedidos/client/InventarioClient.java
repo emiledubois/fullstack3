@@ -1,12 +1,13 @@
 package com.smartlogix.pedidos.client;
 
+import com.smartlogix.pedidos.security.InternalTokenSigner;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
-// Circuit Breaker 
+// Circuit Breaker
 // Llama a ms-inventario. Si falla, activa stockFallback.
 @Component
 @Slf4j
@@ -14,8 +15,11 @@ public class InventarioClient {
 
     private final WebClient webClient;
 
-    public InventarioClient(@Value("${inventario.service.url:http://ms-inventario:8082}") String url) {
-        this.webClient = WebClient.builder().baseUrl(url).build();
+    public InventarioClient(
+            @Value("${inventario.service.url:http://ms-inventario:8082}") String url,
+            InternalTokenSigner internalTokenSigner) {
+        this.webClient = WebClient.builder().baseUrl(url)
+            .filter(internalTokenSigner.exchangeFilter()).build();
     }
 
     @CircuitBreaker(name = "inventario", fallbackMethod = "stockFallback")

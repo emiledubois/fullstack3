@@ -55,6 +55,9 @@ jobs:
       # CI-only value — never used outside this ephemeral runner, real secrets
       # come from JWT_SECRET in each environment's own .env
       JWT_SECRET: ci-only-jwt-secret-do-not-use-in-any-real-environment-0123456789
+      # CI-only value — distinct from JWT_SECRET (different trust boundary),
+      # real secrets come from INTERNAL_SERVICE_SECRET in each environment's own .env
+      INTERNAL_SERVICE_SECRET: ci-only-internal-secret-do-not-use-in-any-real-environment-9876543210
     steps:
       - name: Checkout
         uses: actions/checkout@v7

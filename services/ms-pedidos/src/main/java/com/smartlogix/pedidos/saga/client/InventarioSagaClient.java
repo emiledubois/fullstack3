@@ -1,5 +1,6 @@
 package com.smartlogix.pedidos.saga.client;
 
+import com.smartlogix.pedidos.security.InternalTokenSigner;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,8 +15,10 @@ public class InventarioSagaClient {
     private final WebClient webClient;
 
     public InventarioSagaClient(
-            @Value("${inventario.service.url}") String url) {
-        this.webClient = WebClient.builder().baseUrl(url).build();
+            @Value("${inventario.service.url}") String url,
+            InternalTokenSigner internalTokenSigner) {
+        this.webClient = WebClient.builder().baseUrl(url)
+            .filter(internalTokenSigner.exchangeFilter()).build();
     }
 
     @CircuitBreaker(name = "inventario-saga", fallbackMethod = "reservarFallback")

@@ -2,10 +2,13 @@ package com.smartlogix.pedidos.saga;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartlogix.pedidos.dto.CreatePedidoRequest;
+import com.smartlogix.pedidos.security.InternalAuthFilter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -16,12 +19,16 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+// InternalAuthFilter se excluye de este slice test: su lógica (allowlist,
+// firma HMAC, TTL) ya se prueba exhaustivamente en InternalAuthFilterTest;
+// aquí se prueba solo el comportamiento del controller/orquestador.
 @WebMvcTest(
     value = SagaController.class,
     excludeAutoConfiguration = {
         org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
         org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration.class
-    }
+    },
+    excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = InternalAuthFilter.class)
 )
 class SagaControllerTest {
 

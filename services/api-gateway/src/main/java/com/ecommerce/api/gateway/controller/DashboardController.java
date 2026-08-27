@@ -1,6 +1,7 @@
 package com.ecommerce.api.gateway.controller;
 
 import com.ecommerce.api.gateway.dto.*;
+import com.ecommerce.api.gateway.security.InternalTokenSigner;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
@@ -37,19 +38,21 @@ public class DashboardController {
             @Value("${inventario.service.url:http://ms-inventario:8082}") String invUrl,
             @Value("${pedidos.service.url:http://ms-pedidos:8083}")      String pedUrl,
             @Value("${envios.service.url:http://ms-envios:8084}")        String envUrl,
-            WebClient.Builder builder) {
-        this.inventarioClient = builder.baseUrl(invUrl).build();
-        this.pedidosClient    = builder.baseUrl(pedUrl).build();
-        this.enviosClient     = builder.baseUrl(envUrl).build();
+            WebClient.Builder builder,
+            InternalTokenSigner internalTokenSigner) {
+        this.inventarioClient = builder.clone().baseUrl(invUrl).filter(internalTokenSigner.exchangeFilter()).build();
+        this.pedidosClient    = builder.clone().baseUrl(pedUrl).filter(internalTokenSigner.exchangeFilter()).build();
+        this.enviosClient     = builder.clone().baseUrl(envUrl).filter(internalTokenSigner.exchangeFilter()).build();
     }
 
     /**
      * GET /api/dashboard
      *
      * El AuthFilter del gateway ya validó el JWT (ahora vía cookie httpOnly)
-     * antes de llegar aquí. ms-inventario/ms-pedidos/ms-envios nunca
-     * implementaron su propia autenticación (no leen Authorization ni
-     * X-User-Email) — no hay nada que propagar en estas llamadas internas.
+     * antes de llegar aquí. Estas llamadas directas del WebHub a los tres
+     * microservicios se firman como api-gateway (InternalTokenSigner) —
+     * a diferencia de las rutas de GatewayConfig, este controller no pasa
+     * por InternalTokenIssuerFilter, así que la firma se aplica aquí mismo.
      */
     @GetMapping
     public DashboardDTO getDashboard() {

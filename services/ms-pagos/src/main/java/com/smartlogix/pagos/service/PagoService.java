@@ -3,6 +3,8 @@ package com.smartlogix.pagos.service;
 import com.smartlogix.pagos.dto.*;
 import com.smartlogix.pagos.model.Pago;
 import com.smartlogix.pagos.repository.PagoRepository;
+import com.smartlogix.pagos.security.InternalAuthInterceptor;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +23,7 @@ public class PagoService {
 
     private final PagoRepository pagoRepository;
     private final FlowService    flowService;
+    private final InternalAuthInterceptor internalAuthInterceptor;
 
     @Value("${flow.url.confirmation}")       private String  urlConfirmation;
     @Value("${flow.url.return}")             private String  urlReturn;
@@ -29,6 +32,14 @@ public class PagoService {
     @Value("${flow.verify.signature:false}")  private boolean verifySignature;
 
     private final RestTemplate restTemplate = new RestTemplate();
+
+    // Se agrega en @PostConstruct (no en el inicializador del campo) para
+    // que las dos llamadas salientes a ms-pedidos (confirmar-pago,
+    // pago-fallido) siempre vayan firmadas como ms-pagos.
+    @PostConstruct
+    void configurarRestTemplate() {
+        restTemplate.getInterceptors().add(internalAuthInterceptor);
+    }
 
     // Paso 1: iniciar pago con Flow 
     @Transactional

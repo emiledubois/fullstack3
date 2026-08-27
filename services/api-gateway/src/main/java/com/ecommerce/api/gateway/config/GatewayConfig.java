@@ -1,6 +1,7 @@
 package com.ecommerce.api.gateway.config;
 
 import com.ecommerce.api.gateway.filter.AuthFilter;
+import com.ecommerce.api.gateway.filter.InternalTokenIssuerFilter;
 import com.ecommerce.api.gateway.filter.StripCookieFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.server.mvc.handler.*;
@@ -20,6 +21,9 @@ public class GatewayConfig {
     @Autowired
     private StripCookieFilter stripCookieFilter;
 
+    @Autowired
+    private InternalTokenIssuerFilter internalTokenIssuerFilter;
+
     // PUBLIC — no JWT required
     // /api/auth/login  →  auth-service:8081/auth/login  (stripPrefix(1) removes /api)
     @Bean
@@ -38,6 +42,7 @@ public class GatewayConfig {
                 .route(path("/api/inventario/**"), HandlerFunctions.http("http://ms-inventario:8082"))
                 .filter(stripPrefix(1))
                 .filter(authFilter)
+                .filter(internalTokenIssuerFilter)
                 .filter(stripCookieFilter)
                 .build();
     }
@@ -49,6 +54,7 @@ public class GatewayConfig {
                 .route(path("/api/pedidos/**"), HandlerFunctions.http("http://ms-pedidos:8083"))
                 .filter(stripPrefix(1))
                 .filter(authFilter)
+                .filter(internalTokenIssuerFilter)
                 .filter(stripCookieFilter)
                 .build();
     }
@@ -60,6 +66,7 @@ public class GatewayConfig {
                 .route(path("/api/envios/**"), HandlerFunctions.http("http://ms-envios:8084"))
                 .filter(stripPrefix(1))
                 .filter(authFilter)
+                .filter(internalTokenIssuerFilter)
                 .filter(stripCookieFilter)
                 .build();
     }
@@ -71,6 +78,7 @@ public class GatewayConfig {
                 .route(path("/api/sagas/**"), HandlerFunctions.http("http://ms-pedidos:8083"))
                 .filter(stripPrefix(1))
                 .filter(authFilter)
+                .filter(internalTokenIssuerFilter)
                 .filter(stripCookieFilter)
                 .build();
     }
@@ -114,6 +122,7 @@ public class GatewayConfig {
                 .route(path("/api/pagos/**"), HandlerFunctions.http("http://ms-pagos:8086"))
                 .filter(stripPrefix(1))
                 .filter(authFilter)  // JWT requerido para /api/pagos/crear y /api/pagos/{id}
+                .filter(internalTokenIssuerFilter)
                 .filter(stripCookieFilter)
                 .build();
     }

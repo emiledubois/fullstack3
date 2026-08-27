@@ -1,6 +1,8 @@
 package com.smartlogix.pedidos.saga.steps;
 
 import com.smartlogix.pedidos.saga.*;
+import com.smartlogix.pedidos.security.InternalTokenSigner;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -11,12 +13,21 @@ import java.util.Map;
 public class NotifyStep implements SagaStep {
 
     private final WebClient.Builder webClientBuilder;
+    private final InternalTokenSigner internalTokenSigner;
 
     @Value("${notification.service.url}")
     private String notificationUrl;
 
-    public NotifyStep(WebClient.Builder webClientBuilder) {
+    private WebClient webClient;
+
+    public NotifyStep(WebClient.Builder webClientBuilder, InternalTokenSigner internalTokenSigner) {
         this.webClientBuilder = webClientBuilder;
+        this.internalTokenSigner = internalTokenSigner;
+    }
+
+    @PostConstruct
+    void initWebClient() {
+        this.webClient = webClientBuilder.filter(internalTokenSigner.exchangeFilter()).build();
     }
 
     @Override public String getName() { return "NOTIFICAR"; }
@@ -26,7 +37,7 @@ public class NotifyStep implements SagaStep {
         // NO crítico: si falla, la saga igual se considera exitosa.
         // Por eso NO lanzamos SagaStepException — solo logueamos.
         try {
-            webClientBuilder.build()
+            webClient
                 .post()
                 .uri(notificationUrl + "/notificaciones")
                 .bodyValue(Map.of(

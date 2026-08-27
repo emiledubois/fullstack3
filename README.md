@@ -119,6 +119,7 @@ cd fullstack3/ecommerce_microservices
 # Crear archivo .env con las credenciales
 cat > .env << 'EOF'
 JWT_SECRET=tu_secreto_generado_con_openssl_rand_base64_64
+INTERNAL_SERVICE_SECRET=tu_secreto_generado_con_openssl_rand_base64_32
 DB_PASS=tu_password_postgres_generado_con_openssl_rand_base64_32
 FLOW_API_KEY=tu_api_key_sandbox
 FLOW_SECRET_KEY=tu_secret_key_sandbox
@@ -438,6 +439,7 @@ Este proyecto se construye y mantiene con un **equipo de agentes de IA recursivo
 | Variable | Servicio | Descripción |
 |----------|----------|-------------|
 | `JWT_SECRET` | api-gateway, auth-service | Secreto HMAC-SHA256 para JWT (generar con `openssl rand -base64 64`) |
+| `INTERNAL_SERVICE_SECRET` | api-gateway, ms-inventario, ms-pedidos, ms-envios, ms-pagos, notification-service | Secreto HMAC-SHA256 para la autenticación interna servicio-a-servicio (`X-Internal-Service`/`X-Internal-Timestamp`/`X-Internal-Signature`) — **distinto de `JWT_SECRET`**, sin valor por defecto, falla al levantar si no está en `.env` (generar con `openssl rand -base64 32`) |
 | `DB_PASS` | Todos los Postgres + servicios con BD | Password de Postgres — **sin valor por defecto**, falla al levantar si no está en `.env` (generar con `openssl rand -base64 32`) |
 | `DB_HOST` / `DB_NAME` | Todos los servicios con BD | Host y nombre de BD (nombre del contenedor Docker) |
 | `INVENTARIO_URL` | ms-pedidos, api-gateway | URL de ms-inventario |
