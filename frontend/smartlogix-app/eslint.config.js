@@ -6,7 +6,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'coverage']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
@@ -33,6 +33,12 @@ export default defineConfig([
       // referenced only as a JSX tag (e.g. destructured `icon: Icon`) is a
       // false-positive "unused" error.
       'react/jsx-uses-vars': 'error',
+    },
+  },
+  {
+    files: ['**/*.test.jsx', '**/*.test.js'],
+    languageOptions: {
+      globals: globals.vitest,
     },
   },
 ])
