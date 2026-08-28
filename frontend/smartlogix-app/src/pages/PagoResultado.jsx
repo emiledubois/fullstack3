@@ -34,14 +34,14 @@ const ESTADOS = {
     color: "text-white",
   },
   PAGADO: {
-    bg: "from-emerald-900 to-emerald-700",
+    bg: "from-[#064e3b] to-[#059669]",
     card: "bg-white",
     icon: CheckIcon,
-    iconBg: "bg-emerald-100 text-emerald-600",
+    iconBg: "bg-[#d1fae5] text-[#059669]",
     titulo: "¡Pago exitoso!",
     subtitulo: "Tu pedido ha sido confirmado y está siendo procesado.",
     color: "text-gray-800",
-    badge: { text: "Pago confirmado", bg: "bg-emerald-100 text-emerald-800" },
+    badge: { text: "Pago confirmado", bg: "bg-[#d1fae5] text-[#065f46]" },
   },
   RECHAZADO: {
     bg: "from-red-900 to-rose-700",
@@ -147,7 +147,7 @@ export default function PagoResultado() {
       <div className="fixed bottom-0 left-0 w-64 h-64 rounded-full bg-white/5 translate-y-1/2 -translate-x-1/2 pointer-events-none" />
 
       <div
-        className={`relative w-full max-w-md rounded-2xl shadow-2xl overflow-hidden
+        className={`relative w-full max-w-md rounded-result-card shadow-2xl overflow-hidden
           ${cfg.card} transition-all duration-500
           ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
         style={{ transition: "opacity 0.5s, transform 0.5s" }}
@@ -181,7 +181,7 @@ export default function PagoResultado() {
               )}
 
               {/* Title */}
-              <h1 className={`text-2xl font-bold mb-2 text-center ${cfg.color}`}>{cfg.titulo}</h1>
+              <h1 className={`font-heading text-2xl font-bold mb-2 text-center ${cfg.color}`}>{cfg.titulo}</h1>
               <p className="text-gray-500 text-sm text-center mb-6 leading-relaxed">{cfg.subtitulo}</p>
 
               {/* Payment details */}

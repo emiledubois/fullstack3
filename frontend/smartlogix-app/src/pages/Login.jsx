@@ -45,48 +45,48 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-950 to-blue-800 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-brand-900 to-brand-700 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white">SmartLogix</h1>
-          <p className="text-blue-200 text-sm mt-1">Plataforma de Gestión Logística</p>
+          <h1 className="font-heading text-3xl font-bold text-white">SmartLogix</h1>
+          <p className="text-white/70 text-sm mt-1">Plataforma de Gestión Logística</p>
         </div>
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
-          <h2 className="text-xl font-semibold text-gray-800 mb-6">
+        <div className="bg-white rounded-login-card shadow-2xl p-8">
+          <h2 className="font-heading text-xl font-semibold text-ink-900 mb-6">
             {isReg ? "Crear cuenta" : "Iniciar sesión"}
           </h2>
           {msg && (
-            <div className={`rounded-lg p-3 mb-4 text-sm font-medium ${
+            <div className={`rounded-input p-3 mb-4 text-sm font-medium ${
               msg.type === "error"
-                ? "bg-red-50 text-red-700 border border-red-200"
-                : "bg-green-50 text-green-700 border border-green-200"
+                ? "bg-danger-bg text-danger-text border border-danger-border"
+                : "bg-success-bg text-success-text border border-success-text/20"
             }`}>{msg.text}</div>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-ink-600 mb-1">Email</label>
               <input type="email" value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="admin@smartlogix.cl"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-line-500 rounded-input px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
                 required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+              <label className="block text-sm font-medium text-ink-600 mb-1">Contraseña</label>
               <input type="password" value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-line-500 rounded-input px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
                 required />
             </div>
             <button type="submit" disabled={loading}
-              className="w-full bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors">
+              className="w-full bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-nav transition-colors">
               {loading ? "Procesando..." : (isReg ? "Crear cuenta" : "Ingresar")}
             </button>
           </form>
           <div className="mt-4 text-center">
             <button onClick={() => { setIsReg(!isReg); setMsg(null); }}
-              className="text-sm text-blue-600 hover:underline">
+              className="text-sm text-brand-600 hover:underline">
               {isReg ? "¿Ya tienes cuenta? Inicia sesión" : "¿No tienes cuenta? Crear una"}
             </button>
           </div>
