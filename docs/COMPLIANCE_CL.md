@@ -4,6 +4,8 @@
 
 ## 1. Marco normativo relevante
 
+> Ver también [`docs/ISO27001_MAPPING.md`](ISO27001_MAPPING.md): mapeo detallado de los controles técnicos ya implementados contra el Anexo A de ISO/IEC 27001:2022 (93 controles), incluyendo un Statement of Applicability simplificado y la relación real entre esa norma y la Ley 21.663 (que exige a los Operadores de Importancia Vital operar un SGSI alineado con ISO 27001, aunque SmartLogix **probablemente** no califica como OIV hoy — ver el disclaimer de arriba, esta clasificación la debe confirmar un abogado).
+
 | Ley | Nombre | Publicación | Entrada en vigencia | Por qué aplica a SmartLogix |
 |---|---|---|---|---|
 | **Ley 21.663** | Ley Marco de Ciberseguridad e Infraestructura Crítica | 08-04-2024 | Escalonada; obligaciones generales de gestión de ciberseguridad y reporte de incidentes ya vigentes/en despliegue por la ANCI (Agencia Nacional de Ciberseguridad e Infraestructura) durante 2025-2026, con reglamentos complementarios publicándose por tramos | SmartLogix procesa pagos y datos operacionales de PYMEs — aunque probablemente no califique como Operador de Importancia Vital (OIV) hoy, el estándar de "gestión de riesgos de ciberseguridad + reporte de incidentes" es la referencia de buenas prácticas exigible a cualquier proveedor de servicios digitales que quiera vender a clientes regulados (retail, logística, sector financiero) |
@@ -67,10 +69,10 @@ Marcar cada ítem como `✅ implementado`, `⚠️ parcial`, o `❌ pendiente`. 
 | Derecho | Estado | Nota |
 |---|---|---|
 | Acceso (ver qué datos propios tiene SmartLogix) | ❌ pendiente | Requiere endpoint `GET /api/usuarios/me/datos` que agregue datos del titular desde auth-service + ms-pedidos + ms-envios — candidato natural para un ciclo `/dev-cycle` futuro, con `architect` diseñando el contrato BFF análogo al `/api/dashboard` existente |
-| Rectificación | ❌ pendiente | Endpoint de actualización de perfil |
-| Cancelación / supresión | ❌ pendiente | Requiere estrategia de borrado o anonimización cross-servicio (database-per-service complica el borrado atómico — buen caso de uso para el patrón Saga ya usado en `ms-pedidos`) |
-| Oposición | ❌ pendiente | Depende de qué tratamientos opcionales existan (p. ej. notificaciones de marketing, si se agregan) |
-| Portabilidad | ❌ pendiente | Export en formato estructurado (JSON) de los datos del titular |
+| Rectificación | ✅ implementado | `PUT /api/usuarios/me/email` (único campo propio corregible: el email de cuenta), con re-verificación de `passwordActual` y `rectificacionRateLimiter` dedicado — ver `docs/designs/arco-remaining-rights.md` |
+| Cancelación / supresión | ❌ pendiente | Deliberadamente diferido (no bundled con Rectificación/Portabilidad): requiere una decisión real de borrado vs. anonimización cross-servicio (4 bases de datos), sin encaje limpio en el `SagaOrchestrator` existente, y con una pregunta de revocación de sesión que el JWT sin estado de hoy no resuelve — ver `docs/designs/arco-remaining-rights.md` §9.1 (handoff para un ciclo dedicado) |
+| Oposición | ❌ pendiente | Revisado explícitamente: hoy no existe tratamiento opcional/de interés legítimo al cual oponerse (`notification-service` solo envía notificaciones transaccionales necesarias para la ejecución del contrato, sin marketing/analytics/perfilamiento) — construir un endpoint de opt-out ahora sería abstracción especulativa; ver `docs/designs/arco-remaining-rights.md` §9.2 |
+| Portabilidad | ✅ implementado | `GET /api/usuarios/me/datos/exportar` — mismo agregado que Acceso, envuelto en un envoltorio versionado (`formatoVersion`/`tipoSolicitud`) con `Content-Disposition: attachment` — ver `docs/designs/arco-remaining-rights.md` |
 
 > Nota de alcance: el equipo decidió para esta iteración un **checklist + mapeo de controles**, no la implementación completa de estos endpoints. Quedan listados aquí como trabajo futuro priorizable con `/dev-cycle` antes de diciembre 2026.
 

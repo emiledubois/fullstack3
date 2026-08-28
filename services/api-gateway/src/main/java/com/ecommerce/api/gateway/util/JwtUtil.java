@@ -29,6 +29,17 @@ public class JwtUtil {
             .parseSignedClaims(token).getPayload().get("role", String.class);
     }
 
+    // Lee el claim exp del token recién emitido por auth-service en vez de
+    // duplicar jwt.expiration en este servicio — así el Max-Age de la cookie
+    // rotada por rectificación nunca puede desincronizarse del vencimiento
+    // real del JWT (mismo motivo que AuthService/JwtUtil.extractExpiration
+    // en auth-service).
+    public long getRemainingSeconds(String token) {
+        long expMillis = Jwts.parser().verifyWith(getKey()).build()
+            .parseSignedClaims(token).getPayload().getExpiration().getTime();
+        return Math.max(0, (expMillis - System.currentTimeMillis()) / 1000);
+    }
+
     private SecretKey getKey() {
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
     }

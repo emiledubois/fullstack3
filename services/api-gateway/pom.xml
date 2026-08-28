@@ -43,6 +43,15 @@
 		    <groupId>org.springframework.boot</groupId>
 		    <artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
+		<!-- Requerido para que @Valid en RectificacionController (PUT
+		     /usuarios/me/email) realmente valide en runtime — ningún
+		     endpoint previo de api-gateway tenía body con Bean Validation,
+		     así que este starter no existía aquí (auth-service ya lo tiene,
+		     ver arco-remaining-rights.md §4.1). -->
+		<dependency>
+		    <groupId>org.springframework.boot</groupId>
+		    <artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>

@@ -68,6 +68,7 @@ services:
     environment:
       JWT_SECRET: ${JWT_SECRET}
       INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
       AUTH_URL:       http://auth-service:8081
       INVENTARIO_URL: http://ms-inventario:8082
       PEDIDOS_URL:    http://ms-pedidos:8083

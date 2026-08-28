@@ -1,5 +1,6 @@
 package com.ecommerce.api.gateway.controller;
 
+import com.ecommerce.api.gateway.dto.ExportacionDatosDTO;
 import com.ecommerce.api.gateway.security.InternalTokenSigner;
 import com.ecommerce.api.gateway.util.JwtUtil;
 import jakarta.servlet.http.Cookie;
@@ -224,6 +225,77 @@ class UsuarioDatosControllerTest {
         when(jwtUtil.isValid("token-valido")).thenReturn(true);
         when(jwtUtil.extractEmail("token-valido")).thenReturn(email);
         return request;
+    }
+
+    @Test
+    void exportarMisDatos_usuarioConPedidosYEnvios_retorna200ConEnvoltorioYContentDisposition() throws Exception {
+
+        // ARRANGE — criterio de aceptación 13: mismo "datos" que getMisDatos
+        // para el mismo usuario/momento
+        MockHttpServletRequest request = cookieValidaParaEmail("dueña@pyme.cl");
+        authServer.enqueue(new MockResponse().setResponseCode(200)
+            .setHeader("Content-Type", "application/json")
+            .setBody("{\"email\":\"dueña@pyme.cl\",\"role\":\"ROLE_USER\",\"cuentaCreadaEn\":\"2026-01-15T09:00:00\"}"));
+        pedidosServer.enqueue(new MockResponse().setResponseCode(200)
+            .setHeader("Content-Type", "application/json")
+            .setBody("[{\"id\":42,\"clienteNombre\":\"Comercial Andina Ltda.\",\"total\":15990.0,"
+                + "\"status\":\"ENTREGADO\",\"tipoPedido\":\"NACIONAL\",\"destino\":\"Valparaíso\"}]"));
+        enviosServer.enqueue(new MockResponse().setResponseCode(200)
+            .setHeader("Content-Type", "application/json")
+            .setBody("[{\"id\":17,\"pedidoId\":42,\"status\":\"ENTREGADO\",\"tipoEnvio\":\"TERRESTRE\"}]"));
+
+        // ACT
+        ResponseEntity<ExportacionDatosDTO> respuesta = controller.exportarMisDatos(request);
+
+        // ASSERT
+        assertEquals(HttpStatus.OK, respuesta.getStatusCode());
+        ExportacionDatosDTO body = respuesta.getBody();
+        assertNotNull(body);
+        assertEquals("1.0", body.getFormatoVersion());
+        assertEquals("PORTABILIDAD_ARCO", body.getTipoSolicitud());
+        assertEquals("dueña@pyme.cl", body.getTitular());
+        assertEquals("OK", body.getDatos().getEstadoAgregacion());
+        assertEquals(1, body.getDatos().getPedidos().size());
+        assertEquals(1, body.getDatos().getEnvios().size());
+
+        String contentDisposition = respuesta.getHeaders().getFirst("Content-Disposition");
+        assertNotNull(contentDisposition);
+        assertTrue(contentDisposition.startsWith("attachment; filename=\"smartlogix-mis-datos-"));
+        assertTrue(contentDisposition.endsWith(".json\""));
+    }
+
+    @Test
+    void exportarMisDatos_sinCookie_retorna401YNoLlamaANingunServicio() {
+
+        // ARRANGE
+        MockHttpServletRequest request = new MockHttpServletRequest();
+
+        // ACT
+        ResponseEntity<ExportacionDatosDTO> respuesta = controller.exportarMisDatos(request);
+
+        // ASSERT — mismo comportamiento que acceso (criterio de aceptación 14)
+        assertEquals(HttpStatus.UNAUTHORIZED, respuesta.getStatusCode());
+        assertEquals(0, authServer.getRequestCount());
+        assertEquals(0, pedidosServer.getRequestCount());
+    }
+
+    @Test
+    void exportarMisDatos_msPedidosCaido_exportaEstadoParcialNuncaOK() throws Exception {
+
+        // ARRANGE — criterio de aceptación 16: no maquillar una caída como
+        // export completo
+        MockHttpServletRequest request = cookieValidaParaEmail("dueña@pyme.cl");
+        authServer.enqueue(new MockResponse().setResponseCode(200)
+            .setHeader("Content-Type", "application/json")
+            .setBody("{\"email\":\"dueña@pyme.cl\",\"role\":\"ROLE_USER\"}"));
+        pedidosServer.enqueue(new MockResponse().setResponseCode(500));
+
+        // ACT
+        ResponseEntity<ExportacionDatosDTO> respuesta = controller.exportarMisDatos(request);
+
+        // ASSERT
+        assertEquals(HttpStatus.OK, respuesta.getStatusCode());
+        assertNotEquals("OK", respuesta.getBody().getDatos().getEstadoAgregacion());
     }
 
     private static String baseUrl(MockWebServer server) {

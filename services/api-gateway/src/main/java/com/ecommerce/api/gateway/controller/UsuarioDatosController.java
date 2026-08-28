@@ -17,7 +17,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
+import org.springframework.http.HttpHeaders;
+
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -80,6 +84,44 @@ public class UsuarioDatosController {
 
         UsuarioDatosDTO body = agregarDatos(email);
         return ResponseEntity.ok(body);
+    }
+
+    /**
+     * GET /usuarios/me/datos/exportar — Derecho de Portabilidad ARCO+
+     * (arco-remaining-rights.md §4.3).
+     *
+     * Reutiliza EXACTAMENTE la misma agregación de agregarDatos(email) que
+     * getMisDatos — sin nueva lógica de agregación, solo el envoltorio de
+     * exportación versionado (formatoVersion/tipoSolicitud) y el
+     * Content-Disposition que hace descargable la respuesta como archivo.
+     * No "mejora" un estadoAgregacion degradado: un export parcial se
+     * etiqueta como tal, igual que el endpoint de acceso.
+     */
+    @GetMapping("/me/datos/exportar")
+    public ResponseEntity<ExportacionDatosDTO> exportarMisDatos(HttpServletRequest request) {
+        String token = extractToken(request);
+        if (token == null || !jwtUtil.isValid(token))
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+
+        String email = jwtUtil.extractEmail(token);
+        // Auditoría distinta de la de acceso (§7 A09) — dos derechos
+        // legalmente distintos deben quedar auditables por separado.
+        log.info("[ARCO+] Solicitud de portabilidad — email={}", email);
+
+        ExportacionDatosDTO body = ExportacionDatosDTO.builder()
+            .formatoVersion("1.0")
+            .tipoSolicitud("PORTABILIDAD_ARCO")
+            .titular(email)
+            .generadoEn(LocalDateTime.now())
+            .datos(agregarDatos(email))
+            .build();
+
+        String nombreArchivo = "smartlogix-mis-datos-"
+            + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + ".json";
+
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nombreArchivo + "\"")
+            .body(body);
     }
 
     private UsuarioDatosDTO agregarDatos(String email) {
