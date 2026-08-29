@@ -4,12 +4,8 @@ import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import Login from "./Login";
 import { authAPI } from "../services/api";
 
-// Login.jsx's <label> elements are not associated to their inputs via
-// htmlFor/id (a pre-existing markup gap, out of scope to fix here), so
-// getByLabelText can't resolve them — placeholder text is the next-best
-// accessible query per testing-library's own query priority.
-const getEmailInput = () => screen.getByPlaceholderText(/admin@smartlogix\.cl/i);
-const getPasswordInput = () => screen.getByPlaceholderText("••••••••");
+const getEmailInput = () => screen.getByLabelText(/email/i);
+const getPasswordInput = () => screen.getByLabelText(/contraseña/i);
 
 vi.mock("../services/api", () => ({
   authAPI: { login: vi.fn(), register: vi.fn(), logout: vi.fn() },

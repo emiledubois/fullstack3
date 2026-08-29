@@ -64,16 +64,16 @@ export default function Login() {
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-ink-600 mb-1">Email</label>
-              <input type="email" value={email}
+              <label htmlFor="login-email" className="block text-sm font-medium text-ink-600 mb-1">Email</label>
+              <input id="login-email" type="email" value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="admin@smartlogix.cl"
                 className="w-full border border-line-500 rounded-input px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
                 required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-ink-600 mb-1">Contraseña</label>
-              <input type="password" value={password}
+              <label htmlFor="login-password" className="block text-sm font-medium text-ink-600 mb-1">Contraseña</label>
+              <input id="login-password" type="password" value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
                 className="w-full border border-line-500 rounded-input px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600"
