@@ -9,5 +9,8 @@ RUN mvn package -DskipTests -q
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
+# Picks up base-OS CVE patches (e.g. openssl) ahead of the next eclipse-temurin tag refresh
+RUN apk upgrade --no-cache && addgroup -S spring && adduser -S spring -G spring
+USER spring
 EXPOSE 8086
 ENTRYPOINT ["java","-jar","app.jar"]

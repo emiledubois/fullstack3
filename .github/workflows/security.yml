@@ -48,10 +48,9 @@ jobs:
           format: 'sarif'
           output: 'trivy-fs-results.sarif'
           severity: 'CRITICAL,HIGH'
-          # Report-only: surfaces findings in the Security tab without blocking
-          # merges on a scanner false positive. Tighten to exit-code 1 once the
-          # baseline is clean and this is protecting a real deployment.
-          exit-code: '0'
+          # Blocking: baseline confirmed clean (or explicitly suppressed via
+          # .trivyignore), so a CRITICAL/HIGH finding now fails the build.
+          exit-code: '1'
 
       - name: Upload Trivy results to Security tab
         uses: github/codeql-action/upload-sarif@v3
@@ -80,8 +79,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: npm audit (high+ only, non-blocking report)
-        run: npm audit --audit-level=high || true
+      - name: npm audit (high+ only, blocking)
+        run: npm audit --audit-level=high
 
   docker-image-scan:
     name: image-scan (${{ matrix.service }})
@@ -117,7 +116,7 @@ jobs:
           format: 'sarif'
           output: 'trivy-image-${{ matrix.service }}.sarif'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0'
+          exit-code: '1'
 
       - name: Upload image scan results
         uses: github/codeql-action/upload-sarif@v3
@@ -149,7 +148,7 @@ jobs:
           format: 'sarif'
           output: 'trivy-image-frontend.sarif'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0'
+          exit-code: '1'
 
       - name: Upload image scan results
         uses: github/codeql-action/upload-sarif@v3

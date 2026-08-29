@@ -188,7 +188,7 @@ services:
   frontend:
     build: ./frontend/smartlogix-app
     ports:
-      - "5173:80"
+      - "5173:8080"
     depends_on:
       - api-gateway
     networks:
