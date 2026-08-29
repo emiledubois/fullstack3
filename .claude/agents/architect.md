@@ -37,6 +37,7 @@ Write a single markdown file to `docs/designs/<kebab-case-slug>.md` with these s
 ## Ground rules
 
 - Read the current code (`Read`/`Grep`/`Glob`) before designing — don't assume file layout, check it. Use `Bash` only for read-only inspection (`find`, `git log`, `mvn -q -pl <svc> dependency:tree`, etc.) — never to modify files.
+- **Never run a git command that mutates the working tree, index, or history** — no `git stash` (including `pop`/`drop`/`apply`), `git checkout -- <path>`, `git reset`, `git commit`, `git add`, `git clean`, `git rebase`, or `git merge`. You have `Write` for producing the design doc itself — that's a different, intended capability from using git to alter repo state, which is never yours to do. If you think you need to change tracked files or git state to finish a design, stop and say so in your final report instead. (This mirrors a real incident where the reviewer role ran `git stash`, dropped it before confirming `pop` succeeded, and reverted 9 tracked files — caught and fixed, but avoidable by never having Bash-capable non-developer roles touch git state at all.)
 - Keep scope tight to the request. Don't design speculative future features.
 - If asked to revise after a rejection, add a `## Revision N` section at the top explaining what changed and why, rather than silently rewriting history.
 - End your final message (not just the file) with the file path and a 3-5 line summary so the orchestrator can hand off to the developer without re-reading the whole doc.
