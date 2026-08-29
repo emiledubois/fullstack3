@@ -82,6 +82,41 @@ class GatewayConfigTest {
     }
 
     @Test
+    void putPagosInternoPorEmailAnonimizar_viaGateway_retorna404() {
+
+        // ARRANGE — CRÍTICO (arco-cancelacion-oposicion.md §6.4/§7 A01, "el
+        // detalle de implementación más crítico de todo este diseño"): sin
+        // la exclusión de ruta añadida a pagosRoute(), cualquier usuario
+        // autenticado podría anonimizar los pagos de OTRO usuario editando
+        // el email en esta URL. Ni siquiera se envía cookie: si la ruta no
+        // matchea, AuthFilter no llega a ejecutarse en absoluto.
+        String url = "http://localhost:" + port + "/api/pagos/interno/por-email/victima@pyme.cl/anonimizar";
+
+        // ACT
+        ResponseEntity<String> respuesta = restTemplate.exchange(
+                url, org.springframework.http.HttpMethod.PUT, null, String.class);
+
+        // ASSERT
+        assertEquals(404, respuesta.getStatusCode().value());
+    }
+
+    @Test
+    void postPagosCrear_regresion_siSigueProtegidoPorAuthFilterYNoSeConfundeCon404() {
+
+        // ARRANGE — regresión (criterio de aceptación 15): el cambio de
+        // pagosRoute() no debe sombrear ninguna ruta /api/pagos/** legítima
+        // existente — sin cookie, AuthFilter debe responder 401, NUNCA un
+        // 404 de enrutamiento no matcheado.
+        String url = "http://localhost:" + port + "/api/pagos/crear";
+
+        // ACT
+        ResponseEntity<String> respuesta = restTemplate.postForEntity(url, null, String.class);
+
+        // ASSERT
+        assertEquals(401, respuesta.getStatusCode().value());
+    }
+
+    @Test
     void postAuthLogin_regresion_siSigueSiendoRutaPublicaMatcheada() {
 
         // ARRANGE — regresión (criterio 11): /api/auth/login (sin /interno)

@@ -75,6 +75,19 @@ public class OrderService {
     }
 
     /**
+     * Llamado internamente por api-gateway (PUT /pedidos/interno/por-email/
+     * {email}/anonimizar) — derecho de cancelación ARCO+ (arco-cancelacion-
+     * oposicion.md §4.1/§6.3). 0 filas afectadas es un resultado legítimo
+     * (cuenta sin pedidos), no un error.
+     */
+    @Transactional
+    public int anonimizarPorEmail(String email) {
+        int cantidad = orderRepository.anonimizarPorEmail(email, "USUARIO_ELIMINADO");
+        log.info("[ARCO+] Pedidos anonimizados por cancelación — cantidad={}", cantidad);
+        return cantidad;
+    }
+
+    /**
      * Llamado cuando ms-pagos confirma el pago de Flow.
      * 1. Cambia el estado del pedido a PAGADO.
      * 2. Dispara la Saga original (4 pasos: stock → pedido → envío → notif).

@@ -186,4 +186,31 @@ class OrderServiceTest {
         assertTrue(resultado.isEmpty());
     }
 
+    @Test
+    void anonimizarPorEmail_cuentaConPedidos_retornaCantidadDeFilasAfectadas() {
+
+        // ARRANGE — derecho de cancelación ARCO+ (arco-cancelacion-oposicion.md §4.1)
+        when(orderRepository.anonimizarPorEmail("dueña@pyme.cl", "USUARIO_ELIMINADO")).thenReturn(3);
+
+        // ACT
+        int cantidad = orderService.anonimizarPorEmail("dueña@pyme.cl");
+
+        // ASSERT
+        assertEquals(3, cantidad);
+        verify(orderRepository).anonimizarPorEmail("dueña@pyme.cl", "USUARIO_ELIMINADO");
+    }
+
+    @Test
+    void anonimizarPorEmail_cuentaSinPedidos_retornaCeroSinLanzarExcepcion() {
+
+        // ARRANGE — 0 filas afectadas es un resultado legítimo, no un error
+        when(orderRepository.anonimizarPorEmail("nadie@pyme.cl", "USUARIO_ELIMINADO")).thenReturn(0);
+
+        // ACT
+        int cantidad = orderService.anonimizarPorEmail("nadie@pyme.cl");
+
+        // ASSERT
+        assertEquals(0, cantidad);
+    }
+
 }

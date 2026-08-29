@@ -1,10 +1,15 @@
 package com.ecommerce.auth.service;
 
+import com.ecommerce.auth.dto.CancelacionInternaDTO;
+import com.ecommerce.auth.dto.CancelacionInternoRequest;
 import com.ecommerce.auth.dto.LoginRequest;
 import com.ecommerce.auth.dto.LoginResult;
+import com.ecommerce.auth.dto.OposicionInternaDTO;
+import com.ecommerce.auth.dto.OposicionInternoRequest;
 import com.ecommerce.auth.dto.RectificacionInternaDTO;
 import com.ecommerce.auth.dto.RectificarEmailInternoRequest;
 import com.ecommerce.auth.dto.UsuarioInternoDTO;
+import com.ecommerce.auth.exception.ConfirmacionInvalidaException;
 import com.ecommerce.auth.exception.EmailYaRegistradoException;
 import com.ecommerce.auth.exception.InvalidCredentialsException;
 import com.ecommerce.auth.exception.UsuarioNoEncontradoException;
@@ -313,5 +318,280 @@ class AuthServiceTest {
         // ASSERT
         assertEquals("Este email ya está registrado", ex.getMessage());
         verify(jwtUtil, never()).generateToken(any(), any());
+    }
+
+    @Test
+    void login_cuentaEnCancelacionEnProgreso_lanzaInvalidCredentialsExceptionMismoMensajeGenerico() {
+
+        // ARRANGE — criterio de aceptación 9/10 (arco-cancelacion-oposicion.md):
+        // el mensaje público debe seguir siendo genérico (anti-enumeración),
+        // pero el estado se chequea DESPUÉS de verificar la contraseña
+        LoginRequest req = new LoginRequest();
+        req.setEmail("congelada@pyme.cl");
+        req.setPassword("Password123!");
+
+        User user = User.builder()
+                .email("congelada@pyme.cl").password("hash").role("ROLE_USER")
+                .status("CANCELACION_EN_PROGRESO").build();
+
+        when(userRepository.findByEmail("congelada@pyme.cl")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("Password123!", "hash")).thenReturn(true);
+
+        // ACT
+        InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class,
+                () -> authService.login(req));
+
+        // ASSERT
+        assertEquals("Credenciales inválidas", ex.getMessage());
+        verify(jwtUtil, never()).generateToken(any(), any());
+    }
+
+    @Test
+    void buscarUsuarioInterno_oposicionNuncaRegistrada_retornaFalseYNoNull() {
+
+        // ARRANGE — columna NULL en filas preexistentes se trata como false
+        User user = User.builder()
+                .email("dueña@pyme.cl").password("hash").role("ROLE_USER").build();
+        when(userRepository.findByEmail("dueña@pyme.cl")).thenReturn(Optional.of(user));
+
+        // ACT
+        UsuarioInternoDTO dto = authService.buscarUsuarioInterno("dueña@pyme.cl").orElseThrow();
+
+        // ASSERT
+        assertFalse(dto.isOposicionProcesamiento());
+        assertNull(dto.getOposicionRegistradaEn());
+    }
+
+    @Test
+    void iniciarCancelacion_credencialesYConfirmacionValidas_marcaEnProgresoYFijaSolicitadaEn() {
+
+        // ARRANGE
+        User user = User.builder()
+                .id(7L).email("dueña@pyme.cl").password("hash").role("ROLE_USER").build();
+        CancelacionInternoRequest req = new CancelacionInternoRequest();
+        req.setPasswordActual("Password123!");
+        req.setConfirmacion("ELIMINAR_MI_CUENTA");
+
+        when(userRepository.findByEmail("dueña@pyme.cl")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("Password123!", "hash")).thenReturn(true);
+
+        // ACT
+        CancelacionInternaDTO resultado = authService.iniciarCancelacion("dueña@pyme.cl", req);
+
+        // ASSERT
+        assertEquals(7L, resultado.getId());
+        assertEquals("CANCELACION_EN_PROGRESO", resultado.getStatus());
+        assertNotNull(resultado.getCancelacionSolicitadaEn());
+        verify(userRepository).save(argThat(u -> "CANCELACION_EN_PROGRESO".equals(u.getStatus())));
+    }
+
+    @Test
+    void iniciarCancelacion_reintentoDeUnaYaEnProgreso_preservaCancelacionSolicitadaEnOriginal() {
+
+        // ARRANGE — idempotencia: un reintento del mismo paso no debe pisar
+        // la fecha de solicitud original (diseño §7 A04)
+        LocalDateTime original = LocalDateTime.of(2026, 8, 1, 10, 0);
+        User user = User.builder()
+                .id(7L).email("dueña@pyme.cl").password("hash").role("ROLE_USER")
+                .status("CANCELACION_EN_PROGRESO").cancelacionSolicitadaEn(original).build();
+        CancelacionInternoRequest req = new CancelacionInternoRequest();
+        req.setPasswordActual("Password123!");
+        req.setConfirmacion("ELIMINAR_MI_CUENTA");
+
+        when(userRepository.findByEmail("dueña@pyme.cl")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("Password123!", "hash")).thenReturn(true);
+
+        // ACT
+        CancelacionInternaDTO resultado = authService.iniciarCancelacion("dueña@pyme.cl", req);
+
+        // ASSERT
+        assertEquals(original, resultado.getCancelacionSolicitadaEn());
+    }
+
+    @Test
+    void iniciarCancelacion_passwordActualIncorrecta_lanzaInvalidCredentialsExceptionYNoModificaNada() {
+
+        // ARRANGE — mismo oráculo de contraseña que rectificación (§7 A04)
+        User user = User.builder().email("dueña@pyme.cl").password("hash").role("ROLE_USER").build();
+        CancelacionInternoRequest req = new CancelacionInternoRequest();
+        req.setPasswordActual("incorrecta");
+        req.setConfirmacion("ELIMINAR_MI_CUENTA");
+
+        when(userRepository.findByEmail("dueña@pyme.cl")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("incorrecta", "hash")).thenReturn(false);
+
+        // ACT
+        InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class,
+                () -> authService.iniciarCancelacion("dueña@pyme.cl", req));
+
+        // ASSERT
+        assertEquals("Contraseña actual incorrecta", ex.getMessage());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void iniciarCancelacion_confirmacionIncorrecta_lanzaConfirmacionInvalidaExceptionYNoModificaNada() {
+
+        // ARRANGE — defensa en profundidad (§6.2): nunca confiar en que la
+        // validación del gateway sea el único chequeo
+        User user = User.builder().email("dueña@pyme.cl").password("hash").role("ROLE_USER").build();
+        CancelacionInternoRequest req = new CancelacionInternoRequest();
+        req.setPasswordActual("Password123!");
+        req.setConfirmacion("eliminar_mi_cuenta");
+
+        when(userRepository.findByEmail("dueña@pyme.cl")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("Password123!", "hash")).thenReturn(true);
+
+        // ACT & ASSERT
+        assertThrows(ConfirmacionInvalidaException.class,
+                () -> authService.iniciarCancelacion("dueña@pyme.cl", req));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void iniciarCancelacion_cuentaNoExiste_lanzaUsuarioNoEncontradoException() {
+
+        // ARRANGE — edge case: cookie con JWT válido pero email ya no resuelve
+        CancelacionInternoRequest req = new CancelacionInternoRequest();
+        req.setPasswordActual("cualquiera");
+        req.setConfirmacion("ELIMINAR_MI_CUENTA");
+
+        when(userRepository.findByEmail("borrada@pyme.cl")).thenReturn(Optional.empty());
+
+        // ACT & ASSERT
+        assertThrows(UsuarioNoEncontradoException.class,
+                () -> authService.iniciarCancelacion("borrada@pyme.cl", req));
+        verify(passwordEncoder, never()).matches(any(), any());
+    }
+
+    @Test
+    void revertirCancelacion_cuentaEnProgreso_vuelveAActivaYLimpiaSolicitadaEn() {
+
+        // ARRANGE — criterio de aceptación 4: bloqueo por pedidos activos
+        User user = User.builder()
+                .email("dueña@pyme.cl").password("hash").role("ROLE_USER")
+                .status("CANCELACION_EN_PROGRESO")
+                .cancelacionSolicitadaEn(LocalDateTime.now()).build();
+        when(userRepository.findByEmail("dueña@pyme.cl")).thenReturn(Optional.of(user));
+
+        // ACT
+        CancelacionInternaDTO resultado = authService.revertirCancelacion("dueña@pyme.cl");
+
+        // ASSERT
+        assertEquals("ACTIVA", resultado.getStatus());
+        assertNull(resultado.getCancelacionSolicitadaEn());
+    }
+
+    @Test
+    void revertirCancelacion_cuentaNoExiste_lanzaUsuarioNoEncontradoException() {
+
+        // ARRANGE
+        when(userRepository.findByEmail("nadie@pyme.cl")).thenReturn(Optional.empty());
+
+        // ACT & ASSERT
+        assertThrows(UsuarioNoEncontradoException.class,
+                () -> authService.revertirCancelacion("nadie@pyme.cl"));
+    }
+
+    @Test
+    void finalizarCancelacion_cuentaEnProgreso_anonimizaEmailYPasswordYMarcaCancelada() {
+
+        // ARRANGE
+        User user = User.builder()
+                .id(9L).email("dueña@pyme.cl").password("hash").role("ROLE_USER")
+                .status("CANCELACION_EN_PROGRESO").build();
+        when(userRepository.findById(9L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode(any())).thenReturn("hash-aleatorio-nuevo");
+
+        // ACT
+        CancelacionInternaDTO resultado = authService.finalizarCancelacion(9L);
+
+        // ASSERT
+        assertEquals("CANCELADA", resultado.getStatus());
+        assertEquals("usuario-eliminado-9@smartlogix.invalid", resultado.getEmail());
+        assertNotNull(resultado.getCancelacionCompletadaEn());
+        verify(userRepository).save(argThat(u ->
+                "usuario-eliminado-9@smartlogix.invalid".equals(u.getEmail())
+                        && "hash-aleatorio-nuevo".equals(u.getPassword())));
+    }
+
+    @Test
+    void finalizarCancelacion_dobleSubmitFilaYaCancelada_esNoOpIdempotenteSinExcepcion() {
+
+        // ARRANGE — carrera de doble-submit (diseño §7 A04): otra petición
+        // concurrente ya finalizó esta misma cuenta antes de que esta llegue
+        User user = User.builder()
+                .id(9L).email("usuario-eliminado-9@smartlogix.invalid").password("hash-random")
+                .role("ROLE_USER").status("CANCELADA").build();
+        when(userRepository.findById(9L)).thenReturn(Optional.of(user));
+
+        // ACT
+        CancelacionInternaDTO resultado = assertDoesNotThrow(() -> authService.finalizarCancelacion(9L));
+
+        // ASSERT — no-op: no debe volver a guardar ni regenerar el email/password
+        assertEquals("CANCELADA", resultado.getStatus());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void finalizarCancelacion_idNoExiste_lanzaUsuarioNoEncontradoException() {
+
+        // ARRANGE
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
+
+        // ACT & ASSERT
+        assertThrows(UsuarioNoEncontradoException.class,
+                () -> authService.finalizarCancelacion(999L));
+    }
+
+    @Test
+    void registrarOposicion_oponerseTrue_actualizaFlagYTimestamp() {
+
+        // ARRANGE
+        User user = User.builder().email("dueña@pyme.cl").password("hash").role("ROLE_USER").build();
+        OposicionInternoRequest req = new OposicionInternoRequest();
+        req.setOponerse(true);
+        when(userRepository.findByEmail("dueña@pyme.cl")).thenReturn(Optional.of(user));
+
+        // ACT
+        OposicionInternaDTO resultado = authService.registrarOposicion("dueña@pyme.cl", req);
+
+        // ASSERT
+        assertTrue(resultado.getOposicionProcesamiento());
+        assertNotNull(resultado.getOposicionRegistradaEn());
+        verify(userRepository).save(argThat(u -> Boolean.TRUE.equals(u.getOposicionProcesamiento())));
+    }
+
+    @Test
+    void registrarOposicion_oponerseFalseTrasHaberSidoTrue_noEsUnRatchetDeUnSoloSentido() {
+
+        // ARRANGE — criterio de aceptación 17: no es un ratchet de un solo sentido
+        User user = User.builder()
+                .email("dueña@pyme.cl").password("hash").role("ROLE_USER")
+                .oposicionProcesamiento(true)
+                .oposicionRegistradaEn(LocalDateTime.of(2026, 1, 1, 0, 0)).build();
+        OposicionInternoRequest req = new OposicionInternoRequest();
+        req.setOponerse(false);
+        when(userRepository.findByEmail("dueña@pyme.cl")).thenReturn(Optional.of(user));
+
+        // ACT
+        OposicionInternaDTO resultado = authService.registrarOposicion("dueña@pyme.cl", req);
+
+        // ASSERT
+        assertFalse(resultado.getOposicionProcesamiento());
+        assertNotEquals(LocalDateTime.of(2026, 1, 1, 0, 0), resultado.getOposicionRegistradaEn());
+    }
+
+    @Test
+    void registrarOposicion_cuentaNoExiste_lanzaUsuarioNoEncontradoException() {
+
+        // ARRANGE
+        OposicionInternoRequest req = new OposicionInternoRequest();
+        req.setOponerse(true);
+        when(userRepository.findByEmail("nadie@pyme.cl")).thenReturn(Optional.empty());
+
+        // ACT & ASSERT
+        assertThrows(UsuarioNoEncontradoException.class,
+                () -> authService.registrarOposicion("nadie@pyme.cl", req));
     }
 }

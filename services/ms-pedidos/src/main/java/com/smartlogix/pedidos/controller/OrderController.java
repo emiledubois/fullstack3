@@ -63,6 +63,19 @@ public class OrderController {
     }
 
     /**
+     * Derecho de cancelación ARCO+ (arco-cancelacion-oposicion.md §4.1/§6.3).
+     * No enrutable vía /api/pedidos/** (excluido en GatewayConfig.pedidosRoute(),
+     * mismo patrón que getPedidosPorEmail). Solo alcanzable por api-gateway —
+     * InternalAuthFilter ya lo permite en su bucket por defecto, sin cambios
+     * de código.
+     */
+    @PutMapping("/interno/por-email/{email}/anonimizar")
+    public ResponseEntity<Map<String, Integer>> anonimizarPorEmail(@PathVariable String email) {
+        int cantidad = orderService.anonimizarPorEmail(email);
+        return ResponseEntity.ok(Map.of("cantidadAnonimizada", cantidad));
+    }
+
+    /**
      * Llamado internamente por ms-pagos cuando Flow confirma el pago.
      * Cambia el estado del pedido a PAGADO y dispara la Saga.
      * No pasa por el JWT del gateway — es comunicación interna.

@@ -178,4 +178,19 @@ public class PagoService {
     public Optional<Pago> buscarPorToken(String token) {
         return pagoRepository.findByFlowToken(token);
     }
+
+    /**
+     * Llamado internamente por api-gateway (PUT /pagos/interno/por-email/
+     * {email}/anonimizar) — derecho de cancelación ARCO+ (arco-cancelacion-
+     * oposicion.md §4.1/§6.4). Primer endpoint /interno/** de este servicio
+     * — la única forma de que quede a salvo de IDOR es la exclusión de ruta
+     * en GatewayConfig.pagosRoute(), no este método (ver diseño §7 A01).
+     * 0 filas afectadas es un resultado legítimo (cuenta sin pagos), no un error.
+     */
+    @Transactional
+    public int anonimizarPorEmail(String email) {
+        int cantidad = pagoRepository.anonimizarPorEmail(email, "USUARIO_ELIMINADO");
+        log.info("[ARCO+] Pagos anonimizados por cancelación — cantidad={}", cantidad);
+        return cantidad;
+    }
 }

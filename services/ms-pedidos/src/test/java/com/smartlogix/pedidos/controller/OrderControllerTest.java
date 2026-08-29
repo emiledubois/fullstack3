@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 // InternalAuthFilter se excluye de este slice test: su lógica (allowlist,
@@ -143,5 +144,33 @@ class OrderControllerTest {
         resultado.andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void anonimizarPorEmail_cuentaConPedidos_retorna200ConCantidadAnonimizada() throws Exception {
+
+        // ARRANGE — derecho de cancelación ARCO+ (arco-cancelacion-oposicion.md §6.3)
+        when(orderService.anonimizarPorEmail("dueña@pyme.cl")).thenReturn(3);
+
+        // ACT
+        var resultado = mockMvc.perform(put("/pedidos/interno/por-email/dueña@pyme.cl/anonimizar"));
+
+        // ASSERT
+        resultado.andExpect(status().isOk())
+                .andExpect(jsonPath("$.cantidadAnonimizada").value(3));
+    }
+
+    @Test
+    void anonimizarPorEmail_cuentaSinPedidos_retorna200ConCantidadCero() throws Exception {
+
+        // ARRANGE — 0 es un resultado legítimo, no un error
+        when(orderService.anonimizarPorEmail("nadie@pyme.cl")).thenReturn(0);
+
+        // ACT
+        var resultado = mockMvc.perform(put("/pedidos/interno/por-email/nadie@pyme.cl/anonimizar"));
+
+        // ASSERT
+        resultado.andExpect(status().isOk())
+                .andExpect(jsonPath("$.cantidadAnonimizada").value(0));
     }
 }

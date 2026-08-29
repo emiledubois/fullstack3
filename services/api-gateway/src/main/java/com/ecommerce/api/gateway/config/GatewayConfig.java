@@ -150,11 +150,20 @@ public class GatewayConfig {
                 .build();
     }
 
+    // /api/pagos/interno/** se EXCLUYE deliberadamente — mismo motivo que
+    // pedidosRoute()/enviosRoute()/authRoute(): sin esta exclusión, cualquier
+    // usuario autenticado podría anonimizar los pagos de OTRO usuario
+    // editando el email en la URL de PUT /api/pagos/interno/por-email/
+    // {email}/anonimizar (derecho de cancelación ARCO+ — arco-cancelacion-
+    // oposicion.md §6.4/§7 A01, el detalle de implementación más crítico de
+    // todo ese diseño: ms-pagos nunca tuvo un endpoint /interno/** antes,
+    // así que pagosRoute() nunca había necesitado esta exclusión hasta ahora).
     @Bean
     @Order(2)
     public RouterFunction<ServerResponse> pagosRoute() {
         return GatewayRouterFunctions.route("pagos")
-                .route(path("/api/pagos/**"), HandlerFunctions.http("http://ms-pagos:8086"))
+                .route(path("/api/pagos/**").and(path("/api/pagos/interno/**").negate()),
+                        HandlerFunctions.http("http://ms-pagos:8086"))
                 .filter(stripPrefix(1))
                 .filter(authFilter)  // JWT requerido para /api/pagos/crear y /api/pagos/{id}
                 .filter(internalTokenIssuerFilter)

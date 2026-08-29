@@ -153,4 +153,31 @@ class PagoServiceTest {
         // El repositorio debe haber guardado el cambio
         verify(pagoRepository, times(1)).save(pago);
     }
+
+    @Test
+    void anonimizarPorEmail_cuentaConPagos_retornaCantidadDeFilasAfectadas() {
+
+        // ARRANGE — derecho de cancelación ARCO+ (arco-cancelacion-oposicion.md §4.1)
+        when(pagoRepository.anonimizarPorEmail("dueña@pyme.cl", "USUARIO_ELIMINADO")).thenReturn(1);
+
+        // ACT
+        int cantidad = pagoService.anonimizarPorEmail("dueña@pyme.cl");
+
+        // ASSERT
+        assertEquals(1, cantidad);
+        verify(pagoRepository).anonimizarPorEmail("dueña@pyme.cl", "USUARIO_ELIMINADO");
+    }
+
+    @Test
+    void anonimizarPorEmail_cuentaSinPagos_retornaCeroSinLanzarExcepcion() {
+
+        // ARRANGE — 0 filas afectadas es un resultado legítimo, no un error
+        when(pagoRepository.anonimizarPorEmail("nadie@pyme.cl", "USUARIO_ELIMINADO")).thenReturn(0);
+
+        // ACT
+        int cantidad = pagoService.anonimizarPorEmail("nadie@pyme.cl");
+
+        // ASSERT
+        assertEquals(0, cantidad);
+    }
 }
