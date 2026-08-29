@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import Dashboard from "./Dashboard";
@@ -79,20 +79,16 @@ describe("Dashboard", () => {
     expect(onNavigate).toHaveBeenCalledWith("inventario");
   });
 
-  // Dashboard.jsx has no error UI: a rejected dashboardAPI.get() is swallowed
-  // by .catch(console.error), but the .finally(() => setLoading(false)) still
-  // clears the spinner — so the page silently renders the zero-value default
-  // stats instead of either an error message or staying on the spinner
-  // forever. This is a pre-existing UX gap (flagged in
-  // docs/designs/frontend-test-infrastructure.md §Open Questions), not
-  // introduced or fixed by this test; this test documents the actual
-  // behavior so a future fix is a deliberate change, not a silent one.
-  it("silently renders zero-value stats with no error UI when the fetch rejects (documented pre-existing gap)", async () => {
+  it("shows an error state with a working retry button when the fetch rejects", async () => {
     dashboardAPI.get.mockRejectedValueOnce(new Error("network error"));
     render(<Dashboard />);
 
-    await waitFor(() => expect(screen.queryByText(/cargando datos/i)).not.toBeInTheDocument());
-    expect(screen.getByText("Productos")).toBeInTheDocument();
-    expect(screen.getAllByText("0")).not.toHaveLength(0);
+    expect(await screen.findByText(/no pudimos cargar el dashboard/i)).toBeInTheDocument();
+
+    dashboardAPI.get.mockResolvedValueOnce({ data: BASE_DATA });
+    await userEvent.click(screen.getByRole("button", { name: /reintentar/i }));
+
+    expect(await screen.findByText("Productos")).toBeInTheDocument();
+    expect(dashboardAPI.get).toHaveBeenCalledTimes(2);
   });
 });

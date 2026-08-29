@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { dashboardAPI } from "../services/api";
-import { Package, ShoppingCart, Truck, Bell, Clock, Route, DollarSign } from "lucide-react";
+import { Package, ShoppingCart, Truck, Bell, Clock, Route, DollarSign, AlertTriangle, RefreshCw } from "lucide-react";
 import StatusBadge from "../components/StatusBadge";
 
 const TONE_CLASSES = {
@@ -43,23 +43,46 @@ const ESTADO_TONE = { OK: "success", PARCIAL: "warning" };
 export default function Dashboard({ onNavigate }) {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(false);
   const [estado,  setEstado]  = useState("OK");
 
-  useEffect(() => {
+  const fetchData = () => {
     dashboardAPI.get()
       .then(res => {
         setData(res.data);
         setEstado(res.data.estadoServicios ?? "OK");
       })
-      .catch(console.error)
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  const retry = () => {
+    setLoading(true);
+    setError(false);
+    fetchData();
+  };
 
   if (loading) return (
     <div className="flex items-center justify-center h-full">
       <div className="text-center">
         <div className="w-10 h-10 border-4 border-brand-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"/>
         <p className="text-ink-400 text-sm">Cargando datos...</p>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="p-8 px-9 max-w-2xl mx-auto">
+      <div className="bg-white rounded-card border border-line-200 p-8 text-center">
+        <AlertTriangle className="w-8 h-8 text-danger-text mx-auto mb-3" />
+        <p className="text-ink-700 mb-4">No pudimos cargar el dashboard en este momento. Intenta nuevamente en unos minutos.</p>
+        <button onClick={retry}
+                className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm
+                           font-medium px-4 py-2 rounded-nav transition-colors">
+          <RefreshCw className="w-4 h-4" /> Reintentar
+        </button>
       </div>
     </div>
   );

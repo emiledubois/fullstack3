@@ -152,13 +152,23 @@ public class CancelacionController {
         }
 
         // Paso 4: finalizar — SIEMPRE por id (capturado en el paso 1), nunca
-        // re-resolviendo por email (carrera de doble-submit, §7 A04).
-        authClient.put()
-                .uri(uriBuilder -> uriBuilder.path("/auth/interno/usuarios/{email}/cancelacion/finalizar")
-                        .queryParam("id", iniciado.getId()).build(email))
-                .retrieve()
-                .bodyToMono(CancelacionInternaDTO.class)
-                .block();
+        // re-resolviendo por email (carrera de doble-submit, §7 A04). Un
+        // fallo transitorio de auth-service aquí ocurre DESPUÉS de que la
+        // anonimización ya tuvo éxito — degrada a 202 PARCIAL igual que los
+        // pasos 2 y 3 en vez de propagar una excepción sin manejar; el
+        // cliente puede reintentar la misma llamada (finalizarCancelacion es
+        // un no-op idempotente si la fila ya quedó CANCELADA).
+        try {
+            authClient.put()
+                    .uri(uriBuilder -> uriBuilder.path("/auth/interno/usuarios/{email}/cancelacion/finalizar")
+                            .queryParam("id", iniciado.getId()).build(email))
+                    .retrieve()
+                    .bodyToMono(CancelacionInternaDTO.class)
+                    .block();
+        } catch (Exception e) {
+            log.warn("[ARCO+] Cancelación — anonimización completa pero no se pudo finalizar en auth-service, email={}", email);
+            return respuestaParcial();
+        }
 
         ResponseCookie cookieExpirada = ResponseCookie.from(COOKIE_NAME, "")
                 .httpOnly(true)

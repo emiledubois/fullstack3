@@ -337,6 +337,39 @@ class CancelacionControllerTest {
         assertEquals(1, authServer.getRequestCount());
     }
 
+    @Test
+    void cancelarCuenta_finalizarFallaTrasAnonimizarConExito_retorna202SinCookie() throws Exception {
+
+        // ARRANGE — la anonimización ya tuvo éxito en pedidos/pagos; el
+        // último salto a auth-service (finalizar) falla transitoriamente.
+        // Debe degradar a 202 PARCIAL (sin cookie de sesión limpiada) en vez
+        // de propagar la excepción del WebClient sin manejar.
+        cookieValidaParaEmail("dueña@pyme.cl");
+        authServer.enqueue(new MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("{\"id\":13,\"email\":\"dueña@pyme.cl\",\"status\":\"CANCELACION_EN_PROGRESO\"}"));
+        pedidosServer.enqueue(new MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json").setBody("[]"));
+        pedidosServer.enqueue(new MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json").setBody("{\"cantidadAnonimizada\":0}"));
+        pagosServer.enqueue(new MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json").setBody("{\"cantidadAnonimizada\":0}"));
+        authServer.enqueue(new MockResponse().setResponseCode(500));
+
+        // ACT
+        var respuesta = mockMvc.perform(post("/usuarios/me/cancelacion")
+                .cookie(new Cookie(COOKIE_NAME, "token-actual"))
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "passwordActual", "Password123!", "confirmacion", "ELIMINAR_MI_CUENTA"))));
+
+        // ASSERT
+        respuesta.andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.estado").value("PARCIAL"))
+                .andExpect(header().doesNotExist("Set-Cookie"));
+        assertEquals(2, authServer.getRequestCount()); // iniciar + finalizar (fallido)
+    }
+
     private void cookieValidaParaEmail(String email) {
         when(jwtUtil.isValid("token-actual")).thenReturn(true);
         when(jwtUtil.extractEmail("token-actual")).thenReturn(email);
