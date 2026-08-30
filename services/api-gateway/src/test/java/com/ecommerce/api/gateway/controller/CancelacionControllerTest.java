@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.MDC;
 import org.springframework.http.converter.ByteArrayHttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -84,6 +85,7 @@ class CancelacionControllerTest {
         pedidosServer.shutdown();
         enviosServer.shutdown();
         pagosServer.shutdown();
+        MDC.clear();
     }
 
     @Test
@@ -368,6 +370,83 @@ class CancelacionControllerTest {
                 .andExpect(jsonPath("$.estado").value("PARCIAL"))
                 .andExpect(header().doesNotExist("Set-Cookie"));
         assertEquals(2, authServer.getRequestCount()); // iniciar + finalizar (fallido)
+    }
+
+    @Test
+    void cancelarCuenta_conCorrelationIdEnMdc_loPropagaATodasLasLlamadasSalientes() throws Exception {
+
+        // ARRANGE — MDC.put simula lo que CorrelationIdFilter (registrado
+        // globalmente por Spring Boot, no presente en este MockMvc standalone)
+        // ya habría fijado en el hilo del servlet antes de llegar al controller.
+        MDC.put("correlationId", "cid-happy-path");
+        cookieValidaParaEmail("dueña@pyme.cl");
+        authServer.enqueue(new MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("{\"id\":20,\"email\":\"dueña@pyme.cl\",\"status\":\"CANCELACION_EN_PROGRESO\"}"));
+        pedidosServer.enqueue(new MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json").setBody("[]"));
+        pedidosServer.enqueue(new MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json").setBody("{\"cantidadAnonimizada\":0}"));
+        pagosServer.enqueue(new MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json").setBody("{\"cantidadAnonimizada\":0}"));
+        authServer.enqueue(new MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("{\"id\":20,\"status\":\"CANCELADA\"}"));
+
+        // ACT
+        var respuesta = mockMvc.perform(post("/usuarios/me/cancelacion")
+                .cookie(new Cookie(COOKIE_NAME, "token-actual"))
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "passwordActual", "Password123!", "confirmacion", "ELIMINAR_MI_CUENTA"))));
+
+        // ASSERT
+        respuesta.andExpect(status().isOk());
+        assertEquals("cid-happy-path", authServer.takeRequest(2, TimeUnit.SECONDS).getHeader("X-Correlation-Id"));
+        assertEquals("cid-happy-path", pedidosServer.takeRequest(2, TimeUnit.SECONDS).getHeader("X-Correlation-Id"));
+        assertEquals("cid-happy-path", pedidosServer.takeRequest(2, TimeUnit.SECONDS).getHeader("X-Correlation-Id"));
+        assertEquals("cid-happy-path", pagosServer.takeRequest(2, TimeUnit.SECONDS).getHeader("X-Correlation-Id"));
+        assertEquals("cid-happy-path", authServer.takeRequest(2, TimeUnit.SECONDS).getHeader("X-Correlation-Id"));
+    }
+
+    @Test
+    void cancelarCuenta_reintentosDeAnonimizacion_todosLosIntentosLlevanElMismoCorrelationId() throws Exception {
+
+        // ARRANGE — hazard identificado en observability-correlation-ids.md
+        // §5.3/criterio de aceptación 4: Retry.backoff() resuscribe en
+        // Schedulers.parallel(), un hilo distinto del hilo del servlet donde
+        // se fijó el MDC. El correlationId debe capturarse en una variable
+        // local y hornearse como cabecera literal ANTES del reintento — no
+        // volver a leer MDC.get() dentro del operador reactivo — para que
+        // los 4 intentos (inicial + 3 reintentos) lleven el MISMO valor.
+        MDC.put("correlationId", "cid-retry-1");
+        cookieValidaParaEmail("dueña@pyme.cl");
+        authServer.enqueue(new MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("{\"id\":21,\"email\":\"dueña@pyme.cl\",\"status\":\"CANCELACION_EN_PROGRESO\"}"));
+        pedidosServer.enqueue(new MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json").setBody("[]"));
+        pedidosServer.enqueue(new MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json").setBody("{\"cantidadAnonimizada\":1}"));
+        for (int i = 0; i < 4; i++) {
+            pagosServer.enqueue(new MockResponse().setResponseCode(500));
+        }
+
+        // ACT
+        var respuesta = mockMvc.perform(post("/usuarios/me/cancelacion")
+                .cookie(new Cookie(COOKIE_NAME, "token-actual"))
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "passwordActual", "Password123!", "confirmacion", "ELIMINAR_MI_CUENTA"))));
+
+        // ASSERT
+        respuesta.andExpect(status().isAccepted());
+        assertEquals(4, pagosServer.getRequestCount());
+        for (int i = 0; i < 4; i++) {
+            RecordedRequest intento = pagosServer.takeRequest(2, TimeUnit.SECONDS);
+            assertEquals("cid-retry-1", intento.getHeader("X-Correlation-Id"),
+                    "intento #" + (i + 1) + " perdió el correlationId");
+        }
     }
 
     private void cookieValidaParaEmail(String email) {

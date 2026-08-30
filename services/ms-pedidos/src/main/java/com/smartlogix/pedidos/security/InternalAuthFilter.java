@@ -32,8 +32,11 @@ import java.util.regex.Pattern;
  * acepta api-gateway. No reemplaza el JWT del usuario (que ya validó
  * api-gateway) — responde a una pregunta distinta: qué servicio llama.
  */
+// Corre después de CorrelationIdFilter (HIGHEST_PRECEDENCE) para que un
+// rechazo de este filtro también quede trazado con un correlationId — ver
+// observability-correlation-ids.md §5.2.
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Order(Ordered.HIGHEST_PRECEDENCE + 10)
 @Slf4j
 public class InternalAuthFilter implements Filter {
 

@@ -3,10 +3,12 @@ package com.smartlogix.pagos.service;
 import com.smartlogix.pagos.dto.*;
 import com.smartlogix.pagos.model.Pago;
 import com.smartlogix.pagos.repository.PagoRepository;
+import com.smartlogix.pagos.security.CorrelationIdInterceptor;
 import com.smartlogix.pagos.security.InternalAuthInterceptor;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,7 @@ public class PagoService {
     private final PagoRepository pagoRepository;
     private final FlowService    flowService;
     private final InternalAuthInterceptor internalAuthInterceptor;
+    private final CorrelationIdInterceptor correlationIdInterceptor;
 
     @Value("${flow.url.confirmation}")       private String  urlConfirmation;
     @Value("${flow.url.return}")             private String  urlReturn;
@@ -39,6 +42,7 @@ public class PagoService {
     @PostConstruct
     void configurarRestTemplate() {
         restTemplate.getInterceptors().add(internalAuthInterceptor);
+        restTemplate.getInterceptors().add(correlationIdInterceptor);
     }
 
     // Paso 1: iniciar pago con Flow 
@@ -120,6 +124,15 @@ public class PagoService {
             return;
         }
 
+        // correlationId capturado en el hilo que atiende el webhook ANTES de
+        // disparar los métodos @Async — @Async ejecuta en un hilo del pool
+        // de tareas de Spring, que NO hereda el ThreadLocal de MDC del hilo
+        // servlet original (mismo hazard de MDC-vs-thread-hop que
+        // Retry.backoff() en CancelacionController, distinto mecanismo:
+        // aquí el hop lo causa @Async, no un resubscribe reactivo — ver
+        // observability-correlation-ids.md §5.3).
+        String correlationId = MDC.get("correlationId");
+
         // Actualizar estado según código de Flow:
         // 1=pendiente, 2=pagado, 3=rechazado, 4=anulado
         switch (estado.getStatus()) {
@@ -129,19 +142,19 @@ public class PagoService {
                 pagoRepository.save(pago);
                 log.info("[Pagos] Pago EXITOSO: pedidoId={}, monto={}",
                     pago.getPedidoId(), estado.getAmount());
-                confirmarPagoEnPedidos(pago.getPedidoId(), token);
+                confirmarPagoEnPedidos(pago.getPedidoId(), token, correlationId);
             }
             case 3 -> {
                 pago.setEstado(Pago.EstadoPago.RECHAZADO);
                 pagoRepository.save(pago);
                 log.warn("[Pagos] Pago RECHAZADO: pedidoId={}", pago.getPedidoId());
-                notificarPagoFallido(pago.getPedidoId(), "PAGO_RECHAZADO");
+                notificarPagoFallido(pago.getPedidoId(), "PAGO_RECHAZADO", correlationId);
             }
             case 4 -> {
                 pago.setEstado(Pago.EstadoPago.ANULADO);
                 pagoRepository.save(pago);
                 log.warn("[Pagos] Pago ANULADO: pedidoId={}", pago.getPedidoId());
-                notificarPagoFallido(pago.getPedidoId(), "PAGO_ANULADO");
+                notificarPagoFallido(pago.getPedidoId(), "PAGO_ANULADO", correlationId);
             }
             default -> log.info("[Pagos] Pago aún PENDIENTE (status={})", estado.getStatus());
         }
@@ -149,24 +162,38 @@ public class PagoService {
 
     // Notificar a ms-pedidos que el pago fue exitoso
     @Async
-    public void confirmarPagoEnPedidos(Long pedidoId, String token) {
+    public void confirmarPagoEnPedidos(Long pedidoId, String token, String correlationId) {
+        if (correlationId != null) {
+            MDC.put("correlationId", correlationId);
+        }
         try {
             String url = pedidosUrl + "/pedidos/" + pedidoId + "/confirmar-pago?token=" + token;
             restTemplate.postForEntity(url, null, String.class);
             log.info("[Pagos] ms-pedidos notificado: pedidoId={}", pedidoId);
         } catch (Exception e) {
             log.error("[Pagos] Error al notificar ms-pedidos: {}", e.getMessage());
+        } finally {
+            if (correlationId != null) {
+                MDC.remove("correlationId");
+            }
         }
     }
 
-    // Notificar a ms-pedidos que el pago falló 
+    // Notificar a ms-pedidos que el pago falló
     @Async
-    public void notificarPagoFallido(Long pedidoId, String nuevoEstado) {
+    public void notificarPagoFallido(Long pedidoId, String nuevoEstado, String correlationId) {
+        if (correlationId != null) {
+            MDC.put("correlationId", correlationId);
+        }
         try {
             String url = pedidosUrl + "/pedidos/" + pedidoId + "/pago-fallido?estado=" + nuevoEstado;
             restTemplate.postForEntity(url, null, String.class);
         } catch (Exception e) {
             log.error("[Pagos] Error al notificar fallo a ms-pedidos: {}", e.getMessage());
+        } finally {
+            if (correlationId != null) {
+                MDC.remove("correlationId");
+            }
         }
     }
 

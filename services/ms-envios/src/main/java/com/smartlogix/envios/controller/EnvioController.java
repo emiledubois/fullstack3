@@ -4,6 +4,7 @@ import com.smartlogix.envios.dto.*;
 import com.smartlogix.envios.service.EnvioService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import java.util.ArrayList;
@@ -11,13 +12,16 @@ import java.util.List;
 import java.util.Map;
 
 @RestController @RequestMapping("/envios") @RequiredArgsConstructor
+@Slf4j
 public class EnvioController {
 
     private final EnvioService envioService;
 
     @PostMapping
     public ResponseEntity<EnvioDTO> crear(@Valid @RequestBody CreateEnvioRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(envioService.crearEnvio(req));
+        EnvioDTO creado = envioService.crearEnvio(req);
+        log.info("[Envios] Envío creado: id={}, pedidoId={}", creado.getId(), creado.getPedidoId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(creado);
     }
 
     @GetMapping
@@ -62,7 +66,9 @@ public class EnvioController {
                     .body(Map.of("error", "pedidoIds contiene un valor no numérico: " + token));
             }
         }
-        return ResponseEntity.ok(envioService.getPorPedidoIds(ids));
+        List<EnvioDatosDTO> resultado = envioService.getPorPedidoIds(ids);
+        log.info("[Envios] Consulta interna por pedidos — pedidoIds={}, resultados={}", pedidoIds, resultado.size());
+        return ResponseEntity.ok(resultado);
     }
 
 @DeleteMapping("/{id}/cancelar")
@@ -70,6 +76,7 @@ public ResponseEntity<String> cancelarEnvio(
         @PathVariable Long id,
         @RequestParam(required = false) String sagaId) {
     envioService.actualizarStatus(id, "CANCELADO");
+    log.info("[Envios] Envío {} cancelado (compensación saga={})", id, sagaId);
     return ResponseEntity.ok("Envío " + id + " cancelado (compensación saga=" + sagaId + ")");
 }
 

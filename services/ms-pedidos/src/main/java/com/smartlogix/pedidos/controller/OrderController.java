@@ -59,7 +59,9 @@ public class OrderController {
      */
     @GetMapping("/interno/por-email/{email}")
     public ResponseEntity<List<PedidoDatosDTO>> getPedidosPorEmail(@PathVariable String email) {
-        return ResponseEntity.ok(orderService.getPedidosByUserEmail(email));
+        List<PedidoDatosDTO> pedidos = orderService.getPedidosByUserEmail(email);
+        log.info("[ARCO+] Consulta interna de pedidos por email — email={}, resultados={}", email, pedidos.size());
+        return ResponseEntity.ok(pedidos);
     }
 
     /**

@@ -3,6 +3,7 @@ package com.smartlogix.pedidos.saga.client;
 import com.smartlogix.pedidos.security.InternalTokenSigner;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
@@ -24,9 +25,11 @@ public class InventarioSagaClient {
     @CircuitBreaker(name = "inventario-saga", fallbackMethod = "reservarFallback")
     public void reservarStock(Long productoId, int cantidad, String sagaId) {
         log.info("[Saga {}] Reservando stock: productoId={}, cantidad={}", sagaId, productoId, cantidad);
+        String correlationId = MDC.get("correlationId");
         webClient.post()
             .uri("/inventario/{id}/reservar?cantidad={qty}&sagaId={sid}",
                  productoId, cantidad, sagaId)
+            .header("X-Correlation-Id", correlationId)
             .retrieve()
             .onStatus(HttpStatusCode::isError, resp ->
                 resp.bodyToMono(String.class)
@@ -38,9 +41,11 @@ public class InventarioSagaClient {
     @CircuitBreaker(name = "inventario-saga", fallbackMethod = "liberarFallback")
     public void liberarStock(Long productoId, int cantidad, String sagaId) {
         log.info("[Saga {}] Liberando stock (compensación): productoId={}", sagaId, productoId);
+        String correlationId = MDC.get("correlationId");
         webClient.post()
             .uri("/inventario/{id}/liberar?cantidad={qty}&sagaId={sid}",
                  productoId, cantidad, sagaId)
+            .header("X-Correlation-Id", correlationId)
             .retrieve()
             .onStatus(HttpStatusCode::isError, resp ->
                 resp.bodyToMono(String.class)

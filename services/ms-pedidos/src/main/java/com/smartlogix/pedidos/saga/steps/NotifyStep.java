@@ -4,6 +4,7 @@ import com.smartlogix.pedidos.saga.*;
 import com.smartlogix.pedidos.security.InternalTokenSigner;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -37,9 +38,11 @@ public class NotifyStep implements SagaStep {
         // NO crítico: si falla, la saga igual se considera exitosa.
         // Por eso NO lanzamos SagaStepException — solo logueamos.
         try {
+            String correlationId = MDC.get("correlationId");
             webClient
                 .post()
                 .uri(notificationUrl + "/notificaciones")
+                .header("X-Correlation-Id", correlationId)
                 .bodyValue(Map.of(
                     "pedidoId",  ctx.getPedidoId(),
                     "envioId",   ctx.getEnvioId() != null ? ctx.getEnvioId() : 0L,

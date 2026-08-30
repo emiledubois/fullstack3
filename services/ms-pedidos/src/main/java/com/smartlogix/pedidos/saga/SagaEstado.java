@@ -40,6 +40,12 @@ public class SagaEstado {
     private Long pedidoId;
     private Long envioId;
 
+    // Nullable — permite reconstruir qué líneas de log corresponden a esta
+    // fila mucho después de que los logs hayan rotado (observability-
+    // correlation-ids.md §5.5, COMPLIANCE_CL.md §4.4).
+    @Column(name = "correlation_id", length = 64)
+    private String correlationId;
+
     @Column(columnDefinition = "text")
     private String ultimoError;
 

@@ -3,12 +3,14 @@ package com.smartlogix.pedidos.saga;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartlogix.pedidos.dto.CreatePedidoRequest;
 import com.smartlogix.pedidos.saga.steps.*;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.MDC;
 
 import java.util.UUID;
 
@@ -26,6 +28,43 @@ class SagaOrchestratorTest {
     @Mock private CreateShipmentStep   step3;
     @Mock private NotifyStep           step4;
     @InjectMocks private SagaOrchestrator orchestrator;
+
+    @AfterEach
+    void tearDown() {
+        MDC.clear();
+    }
+
+    @Test
+    void ejecutar_conCorrelationIdEnMdc_loPersisteEnElEstadoInicial()
+            throws SagaStepException {
+
+        // ARRANGE — observability-correlation-ids.md §5.5/criterio de
+        // aceptación 7: SagaOrchestrator corre síncrono en el hilo del
+        // servlet, así que MDC.get() es confiable aquí (sin el hazard de
+        // Retry.backoff() de CancelacionController)
+        MDC.put("correlationId", "saga-cid-123");
+        CreatePedidoRequest req = new CreatePedidoRequest();
+        req.setUserId(1L);
+        req.setTotal(300.0);
+        req.setProductoId(1L);
+        req.setCantidad(2);
+
+        when(mapper.convertValue(any(), any(com.fasterxml.jackson.core.type.TypeReference.class)))
+            .thenReturn(java.util.Map.of());
+        when(sagaRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        doNothing().when(step1).execute(any());
+        doNothing().when(step2).execute(any());
+        doNothing().when(step3).execute(any());
+        doNothing().when(step4).execute(any());
+
+        // ACT
+        orchestrator.ejecutar(req);
+
+        // ASSERT
+        ArgumentCaptor<SagaEstado> captor = ArgumentCaptor.forClass(SagaEstado.class);
+        verify(sagaRepo, atLeastOnce()).save(captor.capture());
+        assertEquals("saga-cid-123", captor.getAllValues().get(0).getCorrelationId());
+    }
 
     @Test
     void ejecutar_todosLosPasosExitosos_persisteCompletadaYRetornaExito()

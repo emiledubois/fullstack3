@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartlogix.pedidos.dto.CreatePedidoRequest;
 import com.smartlogix.pedidos.saga.steps.*;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +42,7 @@ public class SagaOrchestrator {
         SagaEstado estado = SagaEstado.builder()
             .sagaId(sagaId).tipo("CREAR_PEDIDO").pasoActual("INICIADA")
             .estado(SagaEstado.EstadoSaga.INICIADA).payload(payload)
+            .correlationId(MDC.get("correlationId"))
             .build();
         sagaRepo.save(estado);
 

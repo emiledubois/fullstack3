@@ -31,8 +31,11 @@ import java.util.Map;
  * únicamente por su propia firma HMAC de Flow, sin cambios).
  * Allowlist (§5.2): crear/consultar pago solo aceptan api-gateway.
  */
+// Corre después de CorrelationIdFilter (HIGHEST_PRECEDENCE) para que un
+// rechazo de este filtro también quede trazado con un correlationId — ver
+// observability-correlation-ids.md §5.2.
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Order(Ordered.HIGHEST_PRECEDENCE + 10)
 @Slf4j
 public class InternalAuthFilter implements Filter {
 

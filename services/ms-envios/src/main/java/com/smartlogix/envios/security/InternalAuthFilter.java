@@ -32,8 +32,11 @@ import java.util.regex.Pattern;
  * (creación de usuario y paso de la Saga comparten el mismo path);
  * todo lo demás solo acepta api-gateway.
  */
+// Corre después de CorrelationIdFilter (HIGHEST_PRECEDENCE) para que un
+// rechazo de este filtro también quede trazado con un correlationId — ver
+// observability-correlation-ids.md §5.2.
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Order(Ordered.HIGHEST_PRECEDENCE + 10)
 @Slf4j
 public class InternalAuthFilter implements Filter {
 

@@ -10,6 +10,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -108,6 +109,7 @@ public class CancelacionController {
         try {
             iniciado = authClient.put()
                     .uri("/auth/interno/usuarios/{email}/cancelacion/iniciar", email)
+                    .header("X-Correlation-Id", MDC.get("correlationId"))
                     .bodyValue(req)
                     .retrieve()
                     .bodyToMono(CancelacionInternaDTO.class)
@@ -137,6 +139,7 @@ public class CancelacionController {
         }
 
         if (!pedidosBloqueantes.isEmpty()) {
+            log.info("[ARCO+] Cancelación bloqueada — email={}, pedidosBloqueantes={}", email, pedidosBloqueantes);
             revertirCancelacion(email);
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(Map.of(
@@ -162,6 +165,7 @@ public class CancelacionController {
             authClient.put()
                     .uri(uriBuilder -> uriBuilder.path("/auth/interno/usuarios/{email}/cancelacion/finalizar")
                             .queryParam("id", iniciado.getId()).build(email))
+                    .header("X-Correlation-Id", MDC.get("correlationId"))
                     .retrieve()
                     .bodyToMono(CancelacionInternaDTO.class)
                     .block();
@@ -178,6 +182,7 @@ public class CancelacionController {
                 .maxAge(0)
                 .build();
 
+        log.info("[ARCO+] Cancelación completada — email={}", email);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookieExpirada.toString())
                 .body(Map.of("estado", "COMPLETADA", "mensaje", "Su cuenta y sus datos personales han sido eliminados."));
@@ -194,8 +199,10 @@ public class CancelacionController {
     // Allowlist de estados terminales, default-deny para cualquier valor no
     // reconocido (arco-cancelacion-oposicion.md §6.1 paso 2).
     private List<Long> obtenerPedidosBloqueantes(String email) {
+        String correlationId = MDC.get("correlationId");
         List<PedidoDatosDTO> pedidos = pedidosClient.get()
                 .uri("/pedidos/interno/por-email/{email}", email)
+                .header("X-Correlation-Id", correlationId)
                 .retrieve()
                 .bodyToFlux(PedidoDatosDTO.class)
                 .collectList()
@@ -214,6 +221,7 @@ public class CancelacionController {
         List<EnvioDatosDTO> envios = enviosClient.get()
                 .uri(uriBuilder -> uriBuilder.path("/envios/interno/por-pedidos")
                         .queryParam("pedidoIds", idsParam).build())
+                .header("X-Correlation-Id", correlationId)
                 .retrieve()
                 .bodyToFlux(EnvioDatosDTO.class)
                 .collectList()
@@ -233,6 +241,7 @@ public class CancelacionController {
         try {
             authClient.put()
                     .uri("/auth/interno/usuarios/{email}/cancelacion/revertir", email)
+                    .header("X-Correlation-Id", MDC.get("correlationId"))
                     .retrieve()
                     .bodyToMono(CancelacionInternaDTO.class)
                     .block();
@@ -247,8 +256,17 @@ public class CancelacionController {
     // una dependencia transitiva de spring-boot-starter-webflux, no se agrega
     // ninguna librería nueva.
     private boolean anonimizarPedidosYPagos(String email) {
+        // correlationId capturado en el hilo del servlet ANTES de construir
+        // el Mono y fijado como valor literal en .header(...): Retry.backoff()
+        // resuscribe en un hilo Schedulers.parallel() distinto en cada
+        // reintento, y MDC es un ThreadLocal — leer MDC.get() dentro de un
+        // operador Reactor compartido perdería el correlationId en un
+        // reintento (observability-correlation-ids.md §5.3).
+        String correlationId = MDC.get("correlationId");
+
         Mono<Boolean> pedidosMono = pedidosClient.put()
                 .uri("/pedidos/interno/por-email/{email}/anonimizar", email)
+                .header("X-Correlation-Id", correlationId)
                 .retrieve()
                 .bodyToMono(Map.class)
                 .retryWhen(Retry.backoff(3, Duration.ofMillis(300)))
@@ -257,6 +275,7 @@ public class CancelacionController {
 
         Mono<Boolean> pagosMono = pagosClient.put()
                 .uri("/pagos/interno/por-email/{email}/anonimizar", email)
+                .header("X-Correlation-Id", correlationId)
                 .retrieve()
                 .bodyToMono(Map.class)
                 .retryWhen(Retry.backoff(3, Duration.ofMillis(300)))

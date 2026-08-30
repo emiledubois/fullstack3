@@ -4,16 +4,24 @@ import com.smartlogix.pagos.dto.CrearPagoRequest;
 import com.smartlogix.pagos.dto.CrearPagoResponse;
 import com.smartlogix.pagos.model.Pago;
 import com.smartlogix.pagos.repository.PagoRepository;
+import com.smartlogix.pagos.security.CorrelationIdInterceptor;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.MDC;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestTemplate;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 @ExtendWith(MockitoExtension.class)
 class PagoServiceTest {
@@ -21,6 +29,11 @@ class PagoServiceTest {
     @Mock private PagoRepository pagoRepository;
     @Mock private FlowService    flowService;
     @InjectMocks private PagoService pagoService;
+
+    @AfterEach
+    void tearDown() {
+        MDC.clear();
+    }
 
     @Test
     void iniciarPago_flowRespondeOk_retornaUrlDeCheckout() {
@@ -152,6 +165,56 @@ class PagoServiceTest {
 
         // El repositorio debe haber guardado el cambio
         verify(pagoRepository, times(1)).save(pago);
+    }
+
+    @Test
+    void confirmarPagoEnPedidos_conCorrelationId_loRestauraEnMdcYLoPropagaAlRestTemplate() {
+
+        // ARRANGE — observability-correlation-ids.md §5.3: confirmarPagoEnPedidos
+        // es @Async (arranca en un hilo del pool de tareas, sin el MDC del
+        // hilo que atendió el webhook), así que debe restaurar el MDC a
+        // partir del parámetro recibido para que CorrelationIdInterceptor
+        // (que lee MDC.get() en ese mismo hilo, sin más saltos) lo fije en
+        // la petición saliente.
+        RestTemplate restTemplate = new RestTemplate();
+        restTemplate.getInterceptors().add(new CorrelationIdInterceptor());
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        ReflectionTestUtils.setField(pagoService, "restTemplate", restTemplate);
+        ReflectionTestUtils.setField(pagoService, "pedidosUrl", "http://ms-pedidos:8083");
+
+        server.expect(requestTo("http://ms-pedidos:8083/pedidos/10/confirmar-pago?token=tok-1"))
+            .andExpect(header("X-Correlation-Id", "cid-webhook-1"))
+            .andRespond(withSuccess());
+
+        // ACT
+        pagoService.confirmarPagoEnPedidos(10L, "tok-1", "cid-webhook-1");
+
+        // ASSERT
+        server.verify();
+        assertNull(MDC.get("correlationId"));
+    }
+
+    @Test
+    void notificarPagoFallido_conCorrelationId_loRestauraEnMdcYLoPropagaAlRestTemplate() {
+
+        // ARRANGE — mismo hazard que confirmarPagoEnPedidos: notificarPagoFallido
+        // también es @Async
+        RestTemplate restTemplate = new RestTemplate();
+        restTemplate.getInterceptors().add(new CorrelationIdInterceptor());
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        ReflectionTestUtils.setField(pagoService, "restTemplate", restTemplate);
+        ReflectionTestUtils.setField(pagoService, "pedidosUrl", "http://ms-pedidos:8083");
+
+        server.expect(requestTo("http://ms-pedidos:8083/pedidos/20/pago-fallido?estado=PAGO_RECHAZADO"))
+            .andExpect(header("X-Correlation-Id", "cid-webhook-2"))
+            .andRespond(withSuccess());
+
+        // ACT
+        pagoService.notificarPagoFallido(20L, "PAGO_RECHAZADO", "cid-webhook-2");
+
+        // ASSERT
+        server.verify();
+        assertNull(MDC.get("correlationId"));
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.smartlogix.pedidos.saga.client;
 import com.smartlogix.pedidos.security.InternalTokenSigner;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -24,8 +25,10 @@ public class EnviosSagaClient {
     @CircuitBreaker(name = "envios-saga", fallbackMethod = "crearFallback")
     public Long crearEnvio(Long pedidoId, String tipoEnvio, String destino, String sagaId) {
         log.info("[Saga {}] Creando envío para pedido={}", sagaId, pedidoId);
+        String correlationId = MDC.get("correlationId");
         Map<?, ?> resp = webClient.post()
             .uri("/envios")
+            .header("X-Correlation-Id", correlationId)
             .bodyValue(Map.of(
                 "pedidoId",   pedidoId,
                 "tipoEnvio",  tipoEnvio != null ? tipoEnvio : "TERRESTRE",
@@ -41,8 +44,10 @@ public class EnviosSagaClient {
     @CircuitBreaker(name = "envios-saga", fallbackMethod = "cancelarFallback")
     public void cancelarEnvio(Long envioId, String sagaId) {
         log.info("[Saga {}] Cancelando envío={} (compensación)", sagaId, envioId);
+        String correlationId = MDC.get("correlationId");
         webClient.delete()
             .uri("/envios/{id}/cancelar?sagaId={sid}", envioId, sagaId)
+            .header("X-Correlation-Id", correlationId)
             .retrieve()
             .toBodilessEntity()
             .block();
