@@ -21,5 +21,14 @@ export default defineConfig({
     globals: true,
     setupFiles: "./src/test/setup.js",
     css: false,
+    coverage: {
+      provider: "v8",
+      thresholds: {
+        lines: 91,
+        branches: 70,
+        functions: 86,
+        statements: 90,
+      },
+    },
   },
 })
