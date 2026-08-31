@@ -101,7 +101,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Build image (not pushed)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: services/${{ matrix.service }}
           push: false
@@ -133,7 +133,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Build image (not pushed)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: frontend/smartlogix-app
           push: false
